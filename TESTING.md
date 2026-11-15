@@ -1,54 +1,54 @@
-# Testing Strategy — Urban Crisis & Crowd Evacuation Engine
+# Testləşdirmə Strategiyası — Urban Crisis & Crowd Evacuation Engine
 
-All tests are automated spec files and run in CI (`.github/workflows/ci.yml`) on every push and pull request.
+Bütün testlər avtomatlaşdırılmış spec fayllarıdır və hər push və pull request zamanı CI (`.github/workflows/ci.yml`) daxilində icra olunur.
 
-## Summary
+## İcmal
 
-| Suite | Command | Tests | What it proves |
+| Test dəsti | Əmr | Test sayı | Nəyi sübut edir |
 |---|---|---|---|
-| Backend unit | `cd backend && npm test` | 72 | Pure rules: routing, rerouting, thresholds, circuit breaker, fallback chain, rate limits, CORS, error contract |
-| Backend integration | `cd backend && npm run test:integration` | 55 | Real PostgreSQL + Prisma transactions, real HTTP to the routing provider, real Socket.IO server |
-| Frontend | `cd frontend && npm test` | 24 | i18n parity (AZ = EN keys and placeholders), Red Alert banner, offline banner, route card, API error translation |
-| Coverage | `cd backend && npm run test:coverage` | 127 | **92.3 % lines · 94.6 % functions · 81.2 % branches** (CI fails below 80 / 80 / 70) |
-| Load test | `cd backend && npm run loadtest` | 600 × 3 scenarios | Botnet mean **141–252 ms** (< 300 ms), duplicate storm → 1 record, single source → 429 |
+| Backend unit | `cd backend && npm test` | 72 | Təmiz biznes qaydaları: marşrutlaşdırma, alternativ marşrut (rerouting), hədlər, circuit breaker, fallback zənciri, rate limit-lər, CORS, xəta kontraktı |
+| Backend inteqrasiya | `cd backend && npm run test:integration` | 55 | Real PostgreSQL + Prisma tranzaksiyaları, marşrutlaşdırma provayderinə real HTTP sorğuları, real Socket.IO serveri |
+| Frontend | `cd frontend && npm test` | 24 | i18n uyğunluğu (AZ = EN açarları və placeholder-lər), Qırmızı Həyəcan banneri, oflayn banner, marşrut kartı, API xəta tərcüməsi |
+| Əhatə dairəsi (Coverage) | `cd backend && npm run test:coverage` | 127 | **92.3 % sətir · 94.6 % funksiya · 81.2 % budaq** (80 / 80 / 70-dən aşağı olduqda CI xəta verir) |
+| Yük testi (Load test) | `cd backend && npm run loadtest` | 600 × 3 ssenari | Botnet orta gecikmə **141–252 ms** (< 300 ms), təkrarlanan axın → 1 qeyd, tək mənbə → 429 |
 
-## Requirement → test traceability
+## Tələb → test izlənilməsi
 
-| Requirement (task.txt) | Test file(s) |
+| Tələb (task.txt) | Test fayl(lar)ı |
 |---|---|
-| Nearest assembly points, occupancy %, recommended route | `unit/crisisAndRouting.test.js`, `integration/routingResilience.int.test.js` |
-| Auto alternative route when a road closes | `unit/crisisAndRouting.test.js` (reroute), `integration/simulation.int.test.js` (road-toggle → plan avoids road) |
-| Auto alternative route at **90 %** occupancy | `unit/thresholds.test.js` (89.9 % keeps / 90 % reroutes), `unit/crisisAndRouting.test.js` |
-| One-click SOS (4 hazard types) + "I am safe" | `integration/citizenSafety.int.test.js` |
-| Live dispatcher dashboard (SOS, occupancy, brigades) | `integration/realtime.int.test.js`, `integration/citizenSafety.int.test.js` |
-| Red Alert: **≥ 4 distinct** SOS / **500 m** or same zone / **5 min** | `unit/thresholds.test.js` (500 m vs 501 m, window start), `unit/crisisRules.test.js` (distinct citizens), `integration/crisisEngine.int.test.js` |
-| Red Alert: occupancy **> 95 %** | `unit/thresholds.test.js` (95.0 % no / 95.2 % yes), `integration/crisisEngine.int.test.js` |
-| One-click execute (brigade + new assembly point) | `integration/crisisEngine.int.test.js` (incl. two dispatchers clicking at once → exactly one brigade) |
-| **Drop #1** Priority #1 special-care SOS + step-free route | `unit/crisisAndRouting.test.js`, `unit/crisisRules.test.js` (MEDICAL unit preferred), `component EvacuationRouteCard.test.jsx` |
-| **Drop #1** AZ / EN switching | `frontend i18n/translations.test.js`, `RedAlertBanner.test.jsx`, `lib/api.test.js` |
-| **Drop #2** Routing API 503 / > 5 s → circuit breaker + fallback + "Oflayn" notice | `unit/circuitBreaker.test.js`, `unit/routingGateway.test.js`, `integration/routingResilience.int.test.js`, `RoutingModeBanner.test.jsx` |
-| **Drop #3** 500+ SOS flood: rate limit + duplicate filter, panel not blocked | `integration/sosFlood.int.test.js`, `unit/floodProtection.test.js`, `unit/rateLimits.test.js`, `frontend lib/throttle.test.js` |
-| **Drop #3** Brigade dispatch protected by JWT + RBAC | `integration/rbac.int.test.js`, `SosFeedList.test.jsx`, `RedAlertBanner.test.jsx` |
-| **Drop #3** Mean latency < 300 ms under mass requests | `integration/sosFlood.int.test.js` (server-side mean via `Server-Timing`), `loadtest/sosFlood.js` (end-to-end) |
+| Ən yaxın toplanış məntəqələri, doluluq %, tövsiyə olunan marşrut | `unit/crisisAndRouting.test.js`, `integration/routingResilience.int.test.js` |
+| Yol bağlandıqda avtomatik alternativ marşrut | `unit/crisisAndRouting.test.js` (alternativ marşrut), `integration/simulation.int.test.js` (road-toggle → plan bağlı yoldan yayınır) |
+| **90 %** doluluqda avtomatik alternativ marşrut | `unit/thresholds.test.js` (89.9 % saxlayır / 90 % yönləndirir), `unit/crisisAndRouting.test.js` |
+| 1 kliklə SOS (4 təhlükə növü) + "Təhlükəsizəm" | `integration/citizenSafety.int.test.js` |
+| Canlı dispetçer paneli (SOS, doluluq, briqadalar) | `integration/realtime.int.test.js`, `integration/citizenSafety.int.test.js` |
+| Qırmızı Həyəcan: **≥ 4 fərqli** SOS / **500 m** və ya eyni zona / **5 dəq** | `unit/thresholds.test.js` (500 m vs 501 m, vaxt pəncərəsi başlanğıcı), `unit/crisisRules.test.js` (fərqli vətəndaşlar), `integration/crisisEngine.int.test.js` |
+| Qırmızı Həyəcan: doluluq **> 95 %** | `unit/thresholds.test.js` (95.0 % xeyr / 95.2 % bəli), `integration/crisisEngine.int.test.js` |
+| 1 kliklə icra (briqada + yeni toplanış məntəqəsi) | `integration/crisisEngine.int.test.js` (o cümlədən iki dispetçer eyni anda kliklədikdə → yalnız bir briqada) |
+| **Drop #1** Prioritet #1 xüsusi qayğı SOS + maneəsiz (panduslu) marşrut | `unit/crisisAndRouting.test.js`, `unit/crisisRules.test.js` (`MEDICAL` briqadaya üstünlük verilir), `component EvacuationRouteCard.test.jsx` |
+| **Drop #1** AZ / EN dil dəyişdirilməsi | `frontend i18n/translations.test.js`, `RedAlertBanner.test.jsx`, `lib/api.test.js` |
+| **Drop #2** Marşrutlaşdırma API-si 503 / > 5 san → circuit breaker + fallback + "Oflayn" bildirişi | `unit/circuitBreaker.test.js`, `unit/routingGateway.test.js`, `integration/routingResilience.int.test.js`, `RoutingModeBanner.test.jsx` |
+| **Drop #3** 500+ SOS seli (flood): rate limit + təkrar filtr, panel bloklanmır | `integration/sosFlood.int.test.js`, `unit/floodProtection.test.js`, `unit/rateLimits.test.js`, `frontend lib/throttle.test.js` |
+| **Drop #3** Briqada göndərişi JWT + RBAC ilə qorunur | `integration/rbac.int.test.js`, `SosFeedList.test.jsx`, `RedAlertBanner.test.jsx` |
+| **Drop #3** Kütləvi sorğular altında orta gecikmə < 300 ms | `integration/sosFlood.int.test.js` (`Server-Timing` üzrə server-tərəfli orta), `loadtest/sosFlood.js` (end-to-end) |
 
-## Reliability & security scenarios covered
+## Əhatə olunan etibarlılıq və təhlükəsizlik ssenariləri
 
-- **Concurrency:** 4 SOS arriving simultaneously → one alert; two simultaneous "execute" clicks → one brigade; two alerts racing for the last free brigade → never the same brigade.
-- **Ownership (IDOR):** closing an SOS needs its one-time access token (400 without, 403 wrong token).
-- **Privacy:** anonymous sockets never receive SOS names/phones; a citizen only receives a PII-free status of their own SOS.
-- **External dependency failure:** HTTP 503, > timeout, provider process gone (connection refused), circuit open (no calls made), stale cache never used after a road closes, automatic recovery.
-- **Abuse:** SOS flood → 429, failed logins → 429, CORS refuses foreign origins, JWT never in a response body.
-- **Input validation:** invalid body / query / path params → 400 with a stable `code`.
+- **Eyni vaxtlılıq (Concurrency):** Eyni anda gələn 4 SOS → bir xəbərdarlıq; iki paralel "icra et" kliki → bir briqada; son boş briqada üçün yarışan iki xəbərdarlıq → heç vaxt eyni briqada təyin edilmir.
+- **Sahiblik (IDOR):** SOS-u bağlamaq üçün onun birdəfəlik giriş tokeni tələb olunur (tokensiz 400, səhv tokenlə 403).
+- **Məxfilik (Privacy):** Anonim soketlər heç vaxt SOS adlarını/telefon nömrələrini almır; vətəndaş yalnız öz SOS-unun fərdi məlumatlardan (PII) təmizlənmiş statusunu alır.
+- **Xarici asılılıq xətası:** HTTP 503, timeout müddətini aşma, provayder prosesinin dayanması (connection refused), circuit açıq vəziyyətdədir (sorğu göndərilmir), yol bağlandıqdan sonra köhnə keş (stale cache) heç vaxt istifadə edilmir, avtomatik bərpa.
+- **Sui-istifadə (Abuse):** SOS seli → 429, uğursuz girişlər → 429, CORS kənar origin-ləri rədd edir, JWT heç vaxt cavab gövdəsində (response body) qaytarılmır.
+- **Giriş validasiyası:** Yanlış gövdə / sorğu / yol parametrləri → sabit `code` ilə 400.
 
-## Load test (`backend/loadtest/sosFlood.js`)
+## Yük testi (`backend/loadtest/sosFlood.js`)
 
-No dependencies. Three scenarios with 600 requests at concurrency 500 after a 100-request warm-up: **botnet** (distinct IPs via `X-Forwarded-For` + distinct citizens), **single-source flood**, **duplicate storm**; a dispatcher loads the dashboard throughout and dispatches a brigade afterwards. Exit code 0 only if the botnet mean is < 300 ms. Run it inside the Docker network to exclude Docker Desktop's port proxy (see README §8).
+Heç bir xarici asılılığı yoxdur. 100 sorğuluq isinmədən (warm-up) sonra 500 paralel əlaqə (concurrency) ilə 600 sorğudan ibarət üç ssenari icra edilir: **botnet** (`X-Forwarded-For` vasitəsilə fərqli IP-lər + fərqli vətəndaşlar), **tək mənbədən sel**, **təkrarlanan axın**; bu müddət ərzində dispetçer paneli davamlı yükləyir və sonda briqada göndərir. Yalnız botnet orta gecikməsi < 300 ms olduqda çıxış kodu 0 olur. Docker Desktop-un port proksisini kənarlaşdırmaq üçün testi Docker şəbəkəsinin daxilində icra edin (bax: README §8).
 
-Why two latency numbers: the in-process integration test asserts the **server-side** mean (from `Server-Timing`, ~50–100 ms) because a single test process cannot open 600 raw TCP connections at once (macOS listen backlog = 128); the load test measures **end-to-end** latency against the real container.
+Niyə iki fərqli gecikmə göstəricisi var: prosesdaxili inteqrasiya testi **server-tərəfli** orta göstəricini (`Server-Timing`-dən ~50–100 ms) yoxlayır, çünki tək bir test prosesi eyni anda 600 xam TCP bağlantısı aça bilmir (macOS listen backlog = 128); yük testi isə real konteynerə qarşı **end-to-end** gecikməni ölçür.
 
-## How the integration tests run
+## İnteqrasiya testlərinin icra qaydası
 
-They use a **separate database `urban_crisis_test`** and never touch the demo database. The schema is synced once per run (`prisma db push`, non-destructive), and every test reseeds the deterministic Baku dataset. The setup refuses to run against a database whose name does not end in `_test`.
+Bu testlər **ayrıca `urban_crisis_test` verilənlər bazasından** istifadə edir və demo bazasına heç vaxt toxunmur. Sxem hər icrada bir dəfə sinxronlaşdırılır (`prisma db push`, dağıdıcı olmayan rejimdə) və hər test deterministik Bakı məlumat dəstini yenidən toxumlayır. Quraşdırma adı `_test` ilə bitməyən verilənlər bazasında işləməkdən imtina edir.
 
 ```bash
 docker compose up -d postgres
@@ -56,15 +56,15 @@ docker exec urban_crisis_postgres psql -U crisis_user -d urban_crisis -c "CREATE
 cd backend && npm run test:integration
 ```
 
-The routing-provider tests start the simulated external API in-process on a random port and shorten the 5 s timeout to 400 ms so the suite stays fast. The production default (5000 ms) is asserted in `unit/thresholds.test.js` and was verified manually against the running container (cut-off at 5.03 s).
+Marşrutlaşdırma provayderi testləri simulyasiya edilmiş xarici API-ni proses daxilində təsadüfi portda işə salır və dəstin sürətli qalması üçün 5 saniyəlik timeout-u 400 ms-ə endirir. İstehsal (production) standartı (5000 ms) `unit/thresholds.test.js` daxilində təsdiqlənir və işləyən konteyner üzərində əllə yoxlanılıb (kəsilmə həddi: 5.03 san).
 
-## Known advisories (`npm audit --omit=dev`)
+## Məlum təhlükəsizlik bildirişləri (`npm audit --omit=dev`)
 
-| Package | Why it is not upgraded yet |
+| Paket | Niyə hələ yenilənməyib |
 |---|---|
-| `zod` < 4.6.6 (memory exhaustion on oversized collections) | Fix is a major upgrade (zod 4). Mitigated: public API schemas contain no unbounded collections (the only array, routing destinations, is capped at 200), string fields have `.max()` limits, and request bodies are capped at 1 MB. |
-| `deepmerge-ts` (via Prisma toolchain) | Fixed only by a Prisma major/minor change that mismatches client and CLI; used at build/CLI time, not on request paths. |
+| `zod` < 4.6.6 (həddən artıq böyük kolleksiyalarda yaddaş tükənməsi) | Həlli major versiya yeniləməsidir (zod 4). Risk azaldılıb: ictimai API sxemlərində sərhədsiz kolleksiyalar yoxdur (yeganə massiv olan marşrutlaşdırma təyinatları 200 ilə məhdudlaşdırılıb), mətn sahələrində `.max()` limitləri var və sorğu gövdələri 1 MB ilə məhdudlaşdırılıb. |
+| `deepmerge-ts` (Prisma alətləri vasitəsilə) | Yalnız klient və CLI uyğunsuzluğu yaradan Prisma major/minor dəyişikliyi ilə düzəlir; sorğu axınında deyil, yalnız build/CLI mərhələsində istifadə olunur. |
 
-## Not covered (by decision)
+## Əhatə olunmayan hissələr (qərar əsasında)
 
-Browser end-to-end tests (Playwright) were left out under hackathon time limits. The end-to-end flows are covered at the API + Socket.IO level instead, and were checked manually in the browser.
+Brauzer end-to-end testləri (Playwright) hakaton vaxt məhdudiyyəti səbəbindən əlavə edilməyib. Bunun əvəzinə end-to-end axınlar API + Socket.IO səviyyəsində əhatə olunub və brauzerdə əllə yoxlanılıb.
