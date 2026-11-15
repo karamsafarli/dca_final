@@ -8,6 +8,7 @@ Bu sənəd **"Urban Crisis & Crowd Evacuation Engine"** hakaton layihəsinin haz
 
 | Alət | İstifadə Məqsədi | Mərhələ |
 |---|---|---|
+| **Claude Code (Anthropic, Claude Opus)** | Layihənin tələblərə uyğunluq auditi, P0 xətalarının (race condition, IDOR, PII yayımı, CORS) testlə-əvvəl (test-first) düzəldilməsi, inteqrasiya test infrastrukturu, Challenge Drop #2 (Circuit Breaker / Fallback) dizaynı və implementasiyası. | Audit, Backend, Frontend, Testlər, Sənədləşmə |
 | **Antigravity AI Agent (Gemini)** | Sistem arxitekturasının planlaşdırılması, Prisma verilənlər bazası sxeminin dizaynı, Dijkstra marşrutlaşdırma və Kritik Böhran Alqoritmi kod şablonlarının hazırlanması, Tailwind CSS UI komponentlərinin qurulması və sənədləşmə. | Planlaşdırma, Backend, Frontend, Testlər, Docker və Sənədləşmə |
 
 ---
@@ -45,6 +46,14 @@ Bu sənəd **"Urban Crisis & Crowd Evacuation Engine"** hakaton layihəsinin haz
 - **İnsan nəzarəti və yoxlama:**
   - Mövcud konteyner verilənlər bazası həcmində (`postgres_data`) cədvəl sütunları əvvəlcədən doldurulmuş sətirlərlə qaldığı üçün `bootstrap.js` daxilində pilləkənli/pandussuz yol və sığınacaq bayraqlarını avtomatik sinxronlaşdıran idempotent funksiya (`syncAccessibilityFlags`) əlavə edilmişdir.
   - `vitest` test dəstinə əlil arabası / maneəsiz marşrut testi əlavə edilərək tam yoxlama aparılmışdır.
+
+### Mərhələ 7: Audit və P0 Düzəlişləri (Claude Code)
+- **AI-nin rolu:** Layihənin `task.txt`-ə qarşı auditi; aşkarlanan xətalar üçün əvvəlcə uğursuz testlərin yazılması, sonra düzəliş (4 *fərqli* vətəndaş qaydası, eyni anda icra zamanı ikiqat briqada, SOS sahiblik tokeni, Socket.IO PII izolyasiyası, CORS).
+- **İnsan nəzarəti:** Hər düzəliş real PostgreSQL üzərində inteqrasiya testləri və brauzerdə canlı yoxlama ilə təsdiqləndi; Prisma-nın təhlükəli `--force-reset` əmri AI agent tərəfindən icra edilmədi — qeyri-dağıdıcı `db push` seçildi.
+
+### Mərhələ 8: Challenge Drop #2 — Circuit Breaker / Fallback (Claude Code)
+- **AI-nin rolu:** Xarici marşrut API-sinin ayrı konteynerdə simulyasiyası (503 / >5 s), asılılıqsız Circuit Breaker, keş + lokal qraf + koordinat matrisi ehtiyat zənciri, vətəndaş "Oflayn / Ehtiyat marşrut rejimi" paneli və dispetçer idarəetmə düymələri.
+- **İnsan nəzarəti və yoxlama:** 5 saniyəlik hədd testdə real ölçüldü (5.03 s-də kəsilmə), `docker compose stop routing-api` ilə real çöküş yoxlandı (bütün sorğular `HTTP 200`, circuit açıq olduqda ~5 ms), avtomatik bərpa health probe ilə təsdiqləndi. Keşin bağlanmış yoldan keçən köhnə marşrut verə bilməməsi üçün açara yol vəziyyəti hash-i əlavə edilməsi qərarı qəbul edildi.
 
 ---
 

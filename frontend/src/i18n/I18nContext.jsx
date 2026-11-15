@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { setErrorTranslator } from '../lib/api';
 import { TRANSLATIONS } from './translations';
 
 const LANG_STORAGE_KEY = 'urban_crisis_lang';
@@ -33,6 +34,12 @@ export function I18nProvider({ children }) {
     },
     [lang]
   );
+
+  // Let the API layer translate backend error codes into the active language
+  setErrorTranslator(t);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   return (
     <I18nContext.Provider value={{ lang, setLang, t }}>

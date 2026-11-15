@@ -65,3 +65,13 @@ describe('Brigade ranking', () => {
     ).toEqual([4, 3, 2, 1]);
   });
 });
+
+describe('shouldRaiseCapacityAlert', () => {
+  it('raises the first time and only again when occupancy grows past the handled level', async () => {
+    const { shouldRaiseCapacityAlert } = await import('../../src/services/crisisEngineService.js');
+    expect(shouldRaiseCapacityAlert(97, null)).toBe(true);
+    expect(shouldRaiseCapacityAlert(97, 97)).toBe(false);
+    expect(shouldRaiseCapacityAlert(96, 97)).toBe(false);
+    expect(shouldRaiseCapacityAlert(99, 97)).toBe(true);
+  });
+});

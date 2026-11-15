@@ -12,7 +12,9 @@
     "prisma:seed": "node prisma/seed.js",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.js",
-    "test:all": "npm test && npm run test:integration"
+    "test:all": "npm test && npm run test:integration",
+    "routing-api": "node src/external/routingApiServer.js",
+    "routing-api:dev": "node --watch src/external/routingApiServer.js"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",

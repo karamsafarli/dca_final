@@ -293,3 +293,34 @@ export function computeShortestPath(
     hasCongestion,
   };
 }
+
+/**
+ * Local routing engine over the backup road graph stored in our own database
+ * (nodes = static coordinate matrix, segments = road graph). Used as the
+ * fallback when the external routing API is unavailable. With an empty graph,
+ * computeShortestPath degrades further to straight-line (haversine) distances.
+ *
+ * ideal: shortest path ignoring closures (to explain *why* we rerouted)
+ * live:  path over currently open (and, if required, wheelchair-accessible) roads
+ */
+export function computeLocalRouteSets(origin, points, nodes, roadSegments, { accessibleOnly = false } = {}) {
+  const ideal = new Map();
+  const live = new Map();
+  for (const point of points) {
+    ideal.set(
+      point.id,
+      computeShortestPath(origin, point, nodes, roadSegments, {
+        ignoreClosures: true,
+        accessibleOnly: false,
+      })
+    );
+    live.set(
+      point.id,
+      computeShortestPath(origin, point, nodes, roadSegments, {
+        ignoreClosures: false,
+        accessibleOnly,
+      })
+    );
+  }
+  return { ideal, live };
+}

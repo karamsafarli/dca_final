@@ -1,6 +1,7 @@
 import {
   Accessibility,
   AlertOctagon,
+  Ambulance,
   Clock,
   Navigation,
   Route,
@@ -15,7 +16,7 @@ function getOccupancyBarClass(percent) {
   return 'bg-emerald-500';
 }
 
-export function EvacuationRouteCard({ plan, isLoading }) {
+export function EvacuationRouteCard({ plan, isLoading, onRequestAssistance, isSubmitting }) {
   const { t } = useI18n();
 
   if (isLoading && !plan) {
@@ -31,6 +32,7 @@ export function EvacuationRouteCard({ plan, isLoading }) {
   const {
     accessibleOnly = false,
     recommendedPoint,
+    assistanceRequired,
     rerouted,
     rerouteReasons = [],
     skippedCrowdedPoint,
@@ -79,6 +81,9 @@ export function EvacuationRouteCard({ plan, isLoading }) {
                   })}
                 </p>
               )}
+              {rerouteReasons.includes('ALL_POINTS_HIGH_OCCUPANCY') && (
+                <p className="text-amber-100/90">• {t('rerouteAllHigh')}</p>
+              )}
               {rerouteReasons.includes('OCCUPANCY_THRESHOLD_90') &&
                 skippedCrowdedPoint && (
                   <p className="text-amber-100/90">
@@ -91,6 +96,42 @@ export function EvacuationRouteCard({ plan, isLoading }) {
                 )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* No reachable / no step-free point: never leave the citizen with an empty card */}
+      {assistanceRequired && (
+        <div
+          role="alert"
+          data-testid="assistance-required"
+          className="rounded-2xl border border-red-500/60 bg-red-950/50 p-4"
+        >
+          <div className="flex items-start gap-2.5">
+            <Ambulance className="mt-0.5 h-5 w-5 shrink-0 text-red-300" aria-hidden="true" />
+            <div className="space-y-1.5 text-sm">
+              <p className="font-bold text-red-100">
+                {assistanceRequired === 'NO_ACCESSIBLE_ROUTE'
+                  ? t('assistanceNoAccessibleTitle')
+                  : t('assistanceNoReachableTitle')}
+              </p>
+              <p className="text-red-100/90">
+                {assistanceRequired === 'NO_ACCESSIBLE_ROUTE'
+                  ? t('assistanceNoAccessibleBody')
+                  : t('assistanceNoReachableBody')}
+              </p>
+            </div>
+          </div>
+          {onRequestAssistance && (
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={onRequestAssistance}
+              className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-500 disabled:opacity-50"
+            >
+              <Ambulance className="h-5 w-5" aria-hidden="true" />
+              {t('assistanceRequestBtn')}
+            </button>
+          )}
         </div>
       )}
 

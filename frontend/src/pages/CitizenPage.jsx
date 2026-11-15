@@ -2,16 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { CitizenRoleSelector } from '../components/citizen/CitizenRoleSelector';
 import { EvacuationRouteCard } from '../components/citizen/EvacuationRouteCard';
+import { RoutingModeBanner } from '../components/citizen/RoutingModeBanner';
 import { SosControlPanel } from '../components/citizen/SosControlPanel';
 import { ZoneCoordinateSelector } from '../components/citizen/ZoneCoordinateSelector';
 import { CrisisMap } from '../components/map/CrisisMap';
 import { useI18n } from '../i18n/I18nContext';
+import { didRouteChange, shouldRefetchPlan } from '../lib/planUpdates';
 import { socket } from '../lib/socket';
 import { crisisApi } from '../services/crisisApi';
 
 const CITIZEN_CODE_KEY = 'urban_crisis_citizen_code';
 const ACTIVE_SOS_KEY = 'urban_crisis_active_sos';
 const CITIZEN_CATEGORY_KEY = 'urban_crisis_citizen_category';
+const PLAN_REFETCH_DEBOUNCE_MS = 400;
 
 function getOrCreateCitizenCode() {
   const existing = localStorage.getItem(CITIZEN_CODE_KEY);
@@ -56,6 +59,9 @@ export function CitizenPage() {
   const [isLoadingPlan, setIsLoadingPlan] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSafeConfirmedAt, setLastSafeConfirmedAt] = useState(null);
+  const planRef = useRef(plan);
+  planRef.current = plan;
+  const refetchTimerRef = useRef(null);
 
   const [activeSos, setActiveSos] = useState(loadStoredSos);
 
@@ -75,8 +81,10 @@ export function CitizenPage() {
         if (!zoneId && data.selectedZone) {
           setSelectedZoneId(data.selectedZone.id);
         }
+        return data;
       } catch (err) {
         toast.error(err.message);
+        return null;
       } finally {
         if (!silent) setIsLoadingPlan(false);
       }
@@ -123,18 +131,22 @@ export function CitizenPage() {
         }
       }
 
-      loadEvacuationPlan({
-        zoneId: selectedZoneId,
-        coord: customCoord,
-        silent: true,
-      });
-      if (
-        payload?.reason === 'ROAD_STATUS_CHANGED' ||
-        payload?.reason === 'OCCUPANCY_CHANGED' ||
-        payload?.reason === 'ALERT_EXECUTED'
-      ) {
-        toast.info(tRef.current('toastRouteRecalculated'));
-      }
+      // Only events that can change routes trigger a refetch, and bursts are
+      // coalesced into one request.
+      if (!shouldRefetchPlan(payload?.reason)) return;
+      clearTimeout(refetchTimerRef.current);
+      refetchTimerRef.current = setTimeout(async () => {
+        const previous = planRef.current;
+        const next = await loadEvacuationPlan({
+          zoneId: selectedZoneId,
+          coord: customCoord,
+          silent: true,
+        });
+        // Tell the citizen only when the guidance they follow really changed
+        if (next && didRouteChange(previous, next)) {
+          toast.info(tRef.current('toastRouteRecalculated'), { toastId: 'route-changed' });
+        }
+      }, PLAN_REFETCH_DEBOUNCE_MS);
     };
 
     // Private, PII-free status of this citizen's own SOS (see citizen:watch below)
@@ -151,11 +163,24 @@ export function CitizenPage() {
       });
     };
 
+    // Routing provider went down / came back (Challenge Drop #2). The plan is
+    // refetched through state:updated; this only tells the user what happened.
+    const handleRoutingStatus = (status) => {
+      if (status?.degraded) {
+        toast.warning(tRef.current('toastRoutingOffline'), { toastId: 'routing-mode' });
+      } else {
+        toast.success(tRef.current('toastRoutingOnline'), { toastId: 'routing-mode' });
+      }
+    };
+
     socket.on('state:updated', handleStateUpdate);
     socket.on('sos:status', handleSosStatus);
+    socket.on('routing:status', handleRoutingStatus);
     return () => {
+      clearTimeout(refetchTimerRef.current);
       socket.off('state:updated', handleStateUpdate);
       socket.off('sos:status', handleSosStatus);
+      socket.off('routing:status', handleRoutingStatus);
     };
   }, [selectedZoneId, customCoord, loadEvacuationPlan]);
 
@@ -219,7 +244,13 @@ export function CitizenPage() {
     );
   };
 
-  const handleSendSos = async ({ hazardType, citizenName, notes, citizenCategory: category }) => {
+  const handleSendSos = async ({
+    hazardType,
+    citizenName,
+    notes,
+    citizenCategory: category,
+    needsTransport,
+  }) => {
     setIsSubmitting(true);
     const effectiveCategory = category || citizenCategory;
     try {
@@ -229,6 +260,7 @@ export function CitizenPage() {
         citizenName,
         hazardType,
         citizenCategory: effectiveCategory,
+        needsTransport: needsTransport || undefined,
         zoneId: plan?.selectedZone?.id || selectedZoneId,
         lat: origin?.lat,
         lng: origin?.lng,
@@ -278,6 +310,8 @@ export function CitizenPage() {
   return (
     <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-4 p-4 lg:grid-cols-12">
       <div className="space-y-4 lg:col-span-5 xl:col-span-4">
+        <RoutingModeBanner routing={plan?.routing} />
+
         <CitizenRoleSelector
           citizenCategory={citizenCategory}
           onChange={handleCategoryChange}
@@ -302,7 +336,18 @@ export function CitizenPage() {
           onMarkSafe={handleMarkSafe}
         />
 
-        <EvacuationRouteCard plan={plan} isLoading={isLoadingPlan} />
+        <EvacuationRouteCard
+          plan={plan}
+          isLoading={isLoadingPlan}
+          isSubmitting={isSubmitting}
+          onRequestAssistance={() =>
+            handleSendSos({
+              hazardType: 'MEDICAL',
+              notes: t('assistanceSosNote'),
+              needsTransport: true,
+            })
+          }
+        />
       </div>
 
       <div className="h-[520px] lg:sticky lg:top-20 lg:col-span-7 lg:h-[calc(100dvh-7rem)] xl:col-span-8">

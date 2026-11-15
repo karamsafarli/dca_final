@@ -21,6 +21,8 @@ const createSosSchema = z.object({
   phone: z.string().max(30).optional(),
   hazardType: z.enum(['FIRE', 'COLLAPSE', 'FLOOD', 'MEDICAL']),
   citizenCategory: z.enum(['STANDARD', 'SPECIAL_CARE']).optional(),
+  // Set when the app found no reachable / step-free route: the citizen must be fetched
+  needsTransport: z.boolean().optional(),
   zoneId: z.coerce.number().int().positive().optional(),
   lat: z.coerce.number().min(-90).max(90).optional(),
   lng: z.coerce.number().min(-180).max(180).optional(),
@@ -96,8 +98,8 @@ router.patch(
   validateBody(safeStatusSchema),
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');
-    const updated = await markCitizenSafe(req.validatedBody, io);
-    res.json({ sos: updated });
+    const result = await markCitizenSafe(req.validatedBody, io);
+    res.json(result);
   })
 );
 

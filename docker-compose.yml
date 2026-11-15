@@ -32,9 +32,32 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-crisis_user}:${POSTGRES_PASSWORD:-crisis_pass}@postgres:5432/${POSTGRES_DB:-urban_crisis}?schema=public
       JWT_SECRET: ${JWT_SECRET:-urban-crisis-hackathon-2026-super-secret-jwt-key}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ROUTING_API_URL: http://routing-api:4100
+      ROUTING_API_CONTROL_TOKEN: ${ROUTING_API_CONTROL_TOKEN:-dev-routing-control-token}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000,http://localhost:5173}
     ports:
       - "${BACKEND_HOST_PORT:-4050}:4000"
+
+  # Simulated EXTERNAL Map & Routing API (Challenge Drop #2). A separate
+  # container so its outages are real network failures for the backend.
+  # Stop it (`docker compose stop routing-api`) or use the dispatcher's
+  # "API: 503 / >5 s" buttons to see the circuit breaker + fallback work.
+  routing-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: urban_crisis_routing_api
+    restart: unless-stopped
+    command: ["node", "src/external/routingApiServer.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      ROUTING_API_PORT: 4100
+      DATABASE_URL: postgresql://${POSTGRES_USER:-crisis_user}:${POSTGRES_PASSWORD:-crisis_pass}@postgres:5432/${POSTGRES_DB:-urban_crisis}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-urban-crisis-hackathon-2026-super-secret-jwt-key}
+      ROUTING_API_CONTROL_TOKEN: ${ROUTING_API_CONTROL_TOKEN:-dev-routing-control-token}
 
   frontend:
     build:

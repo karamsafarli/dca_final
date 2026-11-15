@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { AUTH_COOKIE_NAME, JWT_EXPIRES_IN, JWT_SECRET } from '../config/constants.js';
 import { prisma } from '../config/db.js';
+import { AppError } from '../utils/errors.js';
 
 const SCRYPT_KEYLEN = 64;
 
@@ -103,16 +104,12 @@ export async function authenticateDispatcher(username, password) {
   });
 
   if (!dispatcher || !dispatcher.isActive) {
-    const err = new Error('İstifadəçi adı və ya şifrə yanlışdır');
-    err.statusCode = 401;
-    throw err;
+    throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid username or password');
   }
 
   const valid = verifyPassword(password, dispatcher.passwordHash);
   if (!valid) {
-    const err = new Error('İstifadəçi adı və ya şifrə yanlışdır');
-    err.statusCode = 401;
-    throw err;
+    throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid username or password');
   }
 
   const updated = await prisma.dispatcher.update({

@@ -1,10 +1,27 @@
 import { CRISIS_THRESHOLDS } from '../config/constants.js';
 import { prisma } from '../config/db.js';
 import { calculateOccupancyPercent, findNearestZone } from './geometryService.js';
-import { computeShortestPath } from './routingService.js';
+import { getRoutingGateway } from './routingGateway.js';
+import { computeLocalRouteSets } from './routingService.js';
+
+const UNREACHABLE_ROUTE = Object.freeze({
+  reachable: false,
+  weightedCost: Infinity,
+  distanceMeters: Infinity,
+  estimatedMinutes: null,
+  polyline: [],
+  roadIdsUsed: [],
+  roadNamesUsed: [],
+  closedRoadsEncountered: [],
+  nonAccessibleRoadsEncountered: [],
+  hasCongestion: false,
+});
+
+/** Assembly points that can receive evacuees (FULL kept to explain reroutes). */
+export const isCandidatePoint = (p) => p.status === 'OPEN' || p.status === 'FULL';
 
 /**
- * Pure evacuation evaluation logic (isolated from DB for deterministic unit testing).
+ * Convenience wrapper: local routing + decision logic in one pure call.
  */
 export function evaluateEvacuationOptions(
   origin,
@@ -13,8 +30,29 @@ export function evaluateEvacuationOptions(
   roadSegments,
   { accessibleOnly = false } = {}
 ) {
+  const routeSets = computeLocalRouteSets(
+    origin,
+    assemblyPoints.filter(isCandidatePoint),
+    nodes,
+    roadSegments,
+    { accessibleOnly }
+  );
+  return rankEvacuationOptions(origin, assemblyPoints, routeSets, { accessibleOnly });
+}
+
+/**
+ * Pure evacuation decision logic. Independent of *where* routes came from
+ * (external API, cache, local graph), so the 90% / road-closure / accessibility
+ * rules behave identically in online and offline mode.
+ */
+export function rankEvacuationOptions(
+  origin,
+  assemblyPoints,
+  { ideal, live },
+  { accessibleOnly = false } = {}
+) {
   const candidates = assemblyPoints
-    .filter((p) => p.status === 'OPEN' || p.status === 'FULL')
+    .filter(isCandidatePoint)
     .map((point) => {
       const occupancyPercent = calculateOccupancyPercent(
         point.currentOccupancy,
@@ -26,14 +64,8 @@ export function evaluateEvacuationOptions(
       const isInaccessibleForUser =
         accessibleOnly && point.isWheelchairAccessible === false;
 
-      const idealRoute = computeShortestPath(origin, point, nodes, roadSegments, {
-        ignoreClosures: true,
-        accessibleOnly: false,
-      });
-      const liveRoute = computeShortestPath(origin, point, nodes, roadSegments, {
-        ignoreClosures: false,
-        accessibleOnly,
-      });
+      const idealRoute = ideal.get(point.id) || UNREACHABLE_ROUTE;
+      const liveRoute = live.get(point.id) || UNREACHABLE_ROUTE;
 
       const closedRoadsOnIdeal = idealRoute.closedRoadsEncountered || [];
       const nonAccessibleOnIdeal = idealRoute.nonAccessibleRoadsEncountered || [];
@@ -152,6 +184,15 @@ export function evaluateEvacuationOptions(
     }
   }
 
+  // Nobody should get an empty screen: if no point can be reached on foot
+  // (or step-free for special-care citizens), say so explicitly so the UI can
+  // offer a one-click Priority #1 medical-transport request instead.
+  let assistanceRequired = null;
+  if (!recommended) {
+    assistanceRequired = accessibleOnly ? 'NO_ACCESSIBLE_ROUTE' : 'NO_REACHABLE_POINT';
+    rerouteReasons.push(assistanceRequired);
+  }
+
   const orderedPoints = [...candidates].sort((a, b) => {
     if (recommended && a.id === recommended.id) return -1;
     if (recommended && b.id === recommended.id) return 1;
@@ -167,6 +208,7 @@ export function evaluateEvacuationOptions(
     origin,
     accessibleOnly,
     recommendedPoint: recommended,
+    assistanceRequired,
     rerouted: rerouteReasons.length > 0,
     rerouteReasons,
     skippedCrowdedPoint,
@@ -226,17 +268,23 @@ export async function getEvacuationPlan({
     accessibleOnly === 'true' ||
     citizenCategory === 'SPECIAL_CARE';
 
-  const result = evaluateEvacuationOptions(
-    { lat: originLat, lng: originLng },
-    assemblyPoints,
+  const origin = { lat: originLat, lng: originLng };
+  const { ideal, live, routing } = await getRoutingGateway().resolveRouteSets({
+    origin,
+    points: assemblyPoints.filter(isCandidatePoint),
+    accessibleOnly: requireAccessible,
     nodes,
-    roadSegments,
-    { accessibleOnly: requireAccessible }
-  );
+    roads: roadSegments,
+  });
+
+  const result = rankEvacuationOptions(origin, assemblyPoints, { ideal, live }, {
+    accessibleOnly: requireAccessible,
+  });
 
   return {
     selectedZone,
     ...result,
+    routing,
     roads: roadSegments,
   };
 }

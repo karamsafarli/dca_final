@@ -33,3 +33,16 @@ export const JWT_SECRET =
         throw new Error('JWT_SECRET environment variable must be set in production');
       })()
     : 'dev-urban-crisis-jwt-secret-key-2026');
+
+/**
+ * External Map & Routing API + resilience settings (Challenge Drop #2).
+ * TIMEOUT_MS = 5000: the task defines "> 5 s response time" as a failure.
+ */
+export const ROUTING_CONFIG = {
+  API_URL: process.env.ROUTING_API_URL || 'http://localhost:4100',
+  CONTROL_TOKEN: process.env.ROUTING_API_CONTROL_TOKEN || 'dev-routing-control-token',
+  TIMEOUT_MS: Number(process.env.ROUTING_API_TIMEOUT_MS || 5000),
+  FAILURE_THRESHOLD: Number(process.env.ROUTING_CB_FAILURE_THRESHOLD || 3),
+  OPEN_DURATION_MS: Number(process.env.ROUTING_CB_OPEN_MS || 20000),
+  HEALTH_PROBE_MS: Number(process.env.ROUTING_HEALTH_PROBE_MS || 5000),
+};

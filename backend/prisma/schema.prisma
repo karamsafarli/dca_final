@@ -117,6 +117,7 @@ model Zone {
   sosSignals     SosSignal[]
   rescueBrigades RescueBrigade[]
   criticalAlerts CriticalAlert[]
+  safetyCheckIns SafetyCheckIn[]
 
   @@map("zones")
 }
@@ -235,6 +236,22 @@ model SosSignal {
   @@index([citizenStatus, createdAt])
   @@index([priorityLevel, createdAt])
   @@map("sos_signals")
+}
+
+/// "I am safe" confirmation from a citizen who never sent an SOS.
+/// Kept apart from SosSignal so it never inflates SOS / medical statistics.
+model SafetyCheckIn {
+  id          Int      @id @default(autoincrement())
+  citizenCode String   @map("citizen_code")
+  zoneId      Int      @map("zone_id")
+  lat         Float
+  lng         Float
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  zone Zone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId, createdAt])
+  @@map("safety_check_ins")
 }
 
 model CriticalAlert {

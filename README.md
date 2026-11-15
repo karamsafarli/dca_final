@@ -16,9 +16,15 @@ flowchart LR
     subgraph Backend ["Backend (Node.js 24 + Express + Prisma ORM + Socket.IO)"]
         REST["REST API & Zod Validasiya"]
         TRAFFIC["Simulyasiya Edilmiş Yol-Nəqliyyat API-si"]
-        ROUTER["Dijkstra Marşrutlaşdırma & Rerouting Mühərriki"]
+        GATEWAY["Routing Gateway<br/>Circuit Breaker (5 s timeout) + Fallback"]
+        ROUTER["Lokal Dijkstra Mühərriki (ehtiyat)"]
+        CACHE["Son keşlənmiş marşrutlar (LRU)"]
         CRISIS["Kritik Böhran Alqoritmi (4 SOS / 500m / 5 dəq və >95%)"]
         WS["Socket.IO Real-Time Hub"]
+    end
+
+    subgraph EXT ["Xarici Xidmət (ayrı konteyner)"]
+        MAPAPI["Xarici Xəritə & Marşrutlaşdırma API-si<br/>(simulyasiya: HEALTHY / 503 / >5 s)"]
     end
 
     subgraph DB ["Verilənlər Bazası (PostgreSQL 16)"]
@@ -28,7 +34,11 @@ flowchart LR
     M1 <-->|"HTTP /api/* + WebSocket"| REST
     M2 <-->|"HTTP /api/* + WebSocket"| REST
     REST --> TRAFFIC
-    REST --> ROUTER
+    REST --> GATEWAY
+    GATEWAY -->|"HTTP /v1/route-matrix"| MAPAPI
+    GATEWAY -.->|"xəta / timeout / circuit OPEN"| CACHE
+    GATEWAY -.->|"keş yoxdursa"| ROUTER
+    GATEWAY -->|"routing:status"| WS
     REST --> CRISIS
     TRAFFIC --> PG
     ROUTER --> PG
@@ -66,6 +76,7 @@ Xidmətlər işə düşdükdə Backend avtomatik olaraq Prisma sxemini PostgreSQ
 - **Vətəndaş Paneli (Modul 1):** http://localhost:3000/
 - **Dispetçer Paneli (Modul 2):** http://localhost:3000/dispatcher
 - **Backend API & Healthcheck:** http://localhost:4050/api/health
+- **Marşrut provayderinin vəziyyəti (Circuit Breaker):** http://localhost:4050/api/routing/status
 
 Dayandırmaq üçün:
 ```bash
@@ -96,7 +107,10 @@ Brauzerdə açın: http://localhost:5173 (Vite proksisi `/api` və `/socket.io`-
    npx prisma db push
    npm run prisma:seed
    npm run dev
+   # ayrı terminalda — simulyasiya olunmuş xarici marşrut API-si (port 4100):
+   npm run routing-api
    ```
+   *(`routing-api` işə salınmasa belə sistem çökmür — avtomatik ehtiyat marşrut rejimində işləyir.)*
 3. **Frontend-i quraşdırın və işə salın:**
    ```bash
    cd frontend
@@ -174,7 +188,39 @@ Sistemə sonradan əlavə edilən tələblər əsasında iki kritik funksional q
 
 ---
 
-## 7. Əsas API Endpoint-ləri
+## 7. Challenge Drop #2: Xarici Marşrut API-si Sıradan Çıxdıqda Circuit Breaker / Fallback
+
+**Tələb:** xarici xəritə/marşrut API-si `HTTP 503` qaytardıqda və ya cavab **5 saniyəni** keçdikdə sistem çökməməli, avtomatik ehtiyat mexanizminə keçməli və vətəndaşa *"Oflayn / Ehtiyat marşrut rejimində işləyir"* bildirişi ilə xidmətə davam etməlidir.
+
+**Həll arxitekturası:**
+
+| Qat | Fayl | Məsuliyyət |
+|---|---|---|
+| Xarici provayder (simulyasiya) | `backend/src/external/` | Ayrı konteyner (`routing-api`), real HTTP. Rejimlər: `HEALTHY`, `DOWN` (503), `SLOW` (7 s) |
+| HTTP klient | `backend/src/integrations/routingApiClient.js` | Cavab sxemi `zod` ilə yoxlanılır; yanlış cavab da xəta sayılır |
+| Circuit Breaker | `backend/src/resilience/circuitBreaker.js` | `CLOSED → OPEN` (3 ardıcıl xəta), `OPEN` → 20 s sonra `HALF_OPEN` (1 sınaq), **5 s timeout** + `AbortController` |
+| Marşrut keşi | `backend/src/resilience/routeCache.js` | Son uğurlu xarici marşrutlar (LRU, 30 dəq TTL). Açar yolların cari vəziyyətini (hash) ehtiva edir — **bağlanmış yoldan keçən köhnə marşrut heç vaxt verilmir** |
+| Routing Gateway | `backend/src/services/routingGateway.js` | Heç vaxt exception atmır. Ardıcıllıq: **xarici API → keş → lokal yol qrafı (Dijkstra) → statik koordinat matrisi (düz xətt)** |
+
+**Davranış:**
+- Hər marşrut cavabında `routing` sahəsi: `mode` (`ONLINE`, `FALLBACK_CACHE`, `FALLBACK_LOCAL_GRAPH`, `FALLBACK_STRAIGHT_LINE`), `degraded`, `reason` (`EXTERNAL_UNAVAILABLE`, `EXTERNAL_TIMEOUT`, `CIRCUIT_OPEN`, `EXTERNAL_UNREACHABLE`, `INVALID_RESPONSE`).
+- Circuit `OPEN` olduqda sorğular ölü xidməti gözləmədən **~5 ms**-də lokal ehtiyatdan cavablanır.
+- Vəziyyət dəyişdikdə `routing:status` Socket.IO hadisəsi bütün müştərilərə göndərilir: vətəndaş ekranında sarı *"Oflayn / Ehtiyat marşrut rejimində işləyir"* paneli və bildiriş görünür, marşrut avtomatik yenidən hesablanır.
+- Arxa plan **health probe** (5 s) xidmət bərpa olunduqda istifadəçi trafiki olmadan belə sistemi avtomatik `ONLINE` rejimə qaytarır.
+- 90% doluluq, yol bağlanması və maneəsiz marşrut qaydaları hər iki rejimdə eyni işləyir (qərar məntiqi `rankEvacuationOptions` marşrut mənbəyindən asılı deyil).
+- `/api/health` provayder çökəndə `200 {"status":"degraded"}` qaytarır — sistem işləkdir.
+
+**Demo:** Dispetçer panelində `API: 503`, `API: >5 san`, `API: Bərpa et` düymələri; və ya real çöküş üçün:
+```bash
+docker compose stop routing-api    # vətəndaş paneli ehtiyat rejimə keçir
+docker compose start routing-api   # ~20 s ərzində avtomatik ONLINE
+```
+
+**Testlər:** `tests/unit/circuitBreaker.test.js`, `tests/unit/routingGateway.test.js`, `tests/integration/routingResilience.int.test.js` (real HTTP: 503, timeout, circuit open, keş, bağlantı kəsilməsi, bərpa), `frontend/src/components/citizen/RoutingModeBanner.test.jsx`.
+
+---
+
+## 8. Əsas API Endpoint-ləri
 
 | Metod | Endpoint | İcazə | Təyinat |
 |---|---|---|---|
@@ -185,10 +231,11 @@ Sistemə sonradan əlavə edilən tələblər əsasında iki kritik funksional q
 | `GET` | `/api/citizen/evacuation-plan` | Açıq | Ən yaxın məntəqələr, doluluq %, aktiv/alternativ və maneəsiz (`accessibleOnly`) marşrut |
 | `POST` | `/api/citizen/sos` | Açıq | 1 kliklə SOS göndərmək (`citizenCategory`: `STANDARD` \| `SPECIAL_CARE`) |
 | `PATCH` | `/api/citizen/safe` | Açıq | `"Təhlükəsizəm"` statusunu yeniləmək |
+| `GET` | `/api/routing/status` | Açıq | Xarici marşrut API-si və Circuit Breaker vəziyyəti |
 | `GET` | `/api/traffic/roads` | Açıq | Yol-nəqliyyat şəbəkəsinin cari vəziyyəti |
 | `PATCH` | `/api/traffic/roads/:id/status` | **Dispetçer JWT** | Yolun statusunu dəyişmək (`OPEN`, `CONGESTED`, `CLOSED`) |
 | `GET` | `/api/dispatcher/dashboard` | **Dispetçer JWT** | Dispetçer panelinin tam canlı məlumatı (Priority #1 sıralamalı SOS axını) |
 | `PATCH` | `/api/dispatcher/shelters/:id/occupancy` | **Dispetçer JWT** | Toplanış məntəqəsinin doluluğunu/statusunu yeniləmək |
 | `POST` | `/api/dispatcher/sos/:id/dispatch` | **Dispetçer JWT** | SOS siqnalına xilasetmə briqadası yönləndirmək |
 | `POST` | `/api/dispatcher/alerts/:id/execute` | **Dispetçer JWT** | Qırmızı Həyəcan qərarını 1 kliklə icra etmək |
-| `POST` | `/api/simulation/*` | **Dispetçer JWT** | Demo ssenariləri (`sos-burst`, `road-toggle`, `occupancy-spike`, `reset`) |
+| `POST` | `/api/simulation/*` | **Dispetçer JWT** | Demo ssenariləri (`sos-burst`, `road-toggle`, `occupancy-spike`, `routing-api`, `reset`) |

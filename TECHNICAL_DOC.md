@@ -17,6 +17,8 @@ Fövqəladə hallar zamanı əsas iki problem mövcuddur:
   - `SPECIAL_CARE` profili ilə göndərilən SOS siqnalı avtomatik `priorityLevel = 1` alır, dispetçer siyahısında prioritetləşdirilir (`ORDER BY priority_level ASC, created_at DESC`) və `routingService.js` Dijkstra qraf axtarışında pilləkənli/pandussuz yolları (`!road.isWheelchairAccessible`) və əlçatmaz sığınacaqları filtrdən çıxarır.
 - **Dinamik i18n (`AZ` / `EN`):** React Context (`I18nContext`) və `localStorage` əsaslı tərcümə sistemi bütün komponentlərə tətbiq olunmuşdur.
 
+- **Xarici Marşrut API-si Çöküşünə Davamlılıq (Challenge Drop #2):** Marşrut hesablamaları `RoutingGateway` vasitəsilə xarici xəritə/marşrut API-sinə (ayrı konteynerdə simulyasiya olunur) göndərilir. Hər çağırış 5 saniyəlik timeout-lu **Circuit Breaker** ilə qorunur (3 ardıcıl xəta → `OPEN`, 20 s sonra `HALF_OPEN` sınağı). Xəta, `HTTP 503`, timeout və ya yanlış cavab zamanı sistem exception atmır və ardıcıl olaraq: (1) eyni yol vəziyyəti üçün **son keşlənmiş xarici marşrutlar**, (2) **lokal ehtiyat yol qrafı** üzərində Dijkstra, (3) qraf yoxdursa **statik koordinat matrisi** (haversine) ilə cavab verir. Vətəndaşa "Oflayn / Ehtiyat marşrut rejimində işləyir" paneli göstərilir; health probe xidmət bərpa olunduqda avtomatik onlayn rejimə qaytarır.
+
 ---
 
 ## 2. Seçilmiş Texnologiyalar və Əsaslandırma
@@ -44,6 +46,8 @@ Fövqəladə hallar zamanı əsas iki problem mövcuddur:
 - **SQL Injection Mühafizəsi:** Prisma ORM bütün sorğuları parametrləşdirilmiş şəkildə icra edir.
 - **HTTP Başlıq Təhlükəsizliyi (`helmet`) və CORS:** Server cavabları `helmet` təhlükəsizlik başlıqları və konfiqurasiya olunan `CORS` (`credentials: true`) siyasəti ilə qorunur.
 - **Tranzaksiya Bütövlüyü:** Qırmızı Həyəcan icrası (`executeCriticalAlert`) və briqada təyinatı `prisma.$transaction` daxilində atomik aparılır — eyni anda iki dispetçer klikləsə belə ikiqat briqada göndərilməsinin qarşısı alınır (idempotentlik).
+
+- **Xarici Asılılıqlara Qarşı Dayanıqlılıq:** Circuit Breaker + Fallback (bax: Challenge Drop #2), xarici API cavabının `zod` sxem yoxlaması, keşin yol vəziyyəti hash-i ilə etibarsızlaşdırılması (bağlanmış yoldan keçən köhnə marşrut verilmir).
 
 ### Performans:
 - **Verilənlər Bazası İndeksləri:** `sos_signals(zone_id, created_at)`, `sos_signals(citizen_status, created_at)`, `road_segments(status)`, `critical_alerts(status, created_at)` üzrə kompozit indekslər 5 dəqiqəlik vaxt pəncərəsi sorğularını sürətləndirir.

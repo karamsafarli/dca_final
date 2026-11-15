@@ -8,6 +8,32 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+/**
+ * The backend returns a stable `code` for every error. The active i18n
+ * translator is registered here so every toast shows the message in the
+ * user's selected language, with the server's English text as a fallback.
+ */
+let translateErrorCode = null;
+
+export function setErrorTranslator(fn) {
+  translateErrorCode = fn;
+}
+
+export function toApiError(error) {
+  const code = error.response?.data?.code || (error.response ? 'ERROR' : 'NETWORK_ERROR');
+  const key = `errors.${code}`;
+  const translated = translateErrorCode?.(key);
+  const message =
+    translated && translated !== key
+      ? translated
+      : error.response?.data?.error || error.message || 'Request failed';
+  const apiError = new Error(message);
+  apiError.code = code;
+  apiError.status = error.response?.status ?? null;
+  apiError.details = error.response?.data?.details;
+  return apiError;
+}
+
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
@@ -16,10 +42,6 @@ api.interceptors.response.use(
     if (status === 401 && !url.includes('/auth/login') && !url.includes('/auth/me')) {
       window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
-    const message =
-      error.response?.data?.error ||
-      error.message ||
-      'Serverlə əlaqə zamanı xəta baş verdi';
-    return Promise.reject(new Error(message));
+    return Promise.reject(toApiError(error));
   }
 );

@@ -1,8 +1,8 @@
-import { Flame, Gauge, RotateCcw, RouteOff, Zap } from 'lucide-react';
+import { Flame, Gauge, RotateCcw, RouteOff, Timer, Wifi, WifiOff, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { useI18n } from '../../i18n/I18nContext';
 
-export function SimulationBar({ zones = [], assemblyPoints = [], onRunAction, isBusy }) {
+export function SimulationBar({ zones = [], assemblyPoints = [], routing, onRunAction, isBusy }) {
   const { t } = useI18n();
   const [selectedZoneId, setSelectedZoneId] = useState(null);
 
@@ -86,6 +86,53 @@ export function SimulationBar({ zones = [], assemblyPoints = [], onRunAction, is
         >
           <Gauge className="h-3.5 w-3.5" />
           <span>{t('simSpike97')}</span>
+        </button>
+
+        <span
+          data-testid="routing-api-status"
+          title={routing?.circuit ? `Circuit: ${routing.circuit.state}` : undefined}
+          className={
+            routing?.degraded
+              ? 'flex items-center gap-1.5 rounded-xl border border-amber-500/50 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200'
+              : 'flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200'
+          }
+        >
+          {routing?.degraded ? <WifiOff className="h-3.5 w-3.5" /> : <Wifi className="h-3.5 w-3.5" />}
+          {t('routingApiLabel')}:{' '}
+          {routing?.degraded ? t('routingApiDegraded') : t('routingApiOnline')}
+          {routing?.circuit?.state && routing.circuit.state !== 'CLOSED' && (
+            <span className="font-mono text-[11px]">({routing.circuit.state})</span>
+          )}
+        </span>
+
+        <button
+          type="button"
+          disabled={isBusy}
+          onClick={() => onRunAction('routing-api', { mode: 'DOWN' })}
+          className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/25 disabled:opacity-50"
+        >
+          <WifiOff className="h-3.5 w-3.5" />
+          <span>{t('simRoutingDown')}</span>
+        </button>
+
+        <button
+          type="button"
+          disabled={isBusy}
+          onClick={() => onRunAction('routing-api', { mode: 'SLOW' })}
+          className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/25 disabled:opacity-50"
+        >
+          <Timer className="h-3.5 w-3.5" />
+          <span>{t('simRoutingSlow')}</span>
+        </button>
+
+        <button
+          type="button"
+          disabled={isBusy}
+          onClick={() => onRunAction('routing-api', { mode: 'HEALTHY' })}
+          className="flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
+        >
+          <Wifi className="h-3.5 w-3.5" />
+          <span>{t('simRoutingHealthy')}</span>
         </button>
 
         <button

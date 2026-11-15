@@ -52,3 +52,10 @@ export function emitAlertResolved(io, result, reason) {
   io?.to(DISPATCHER_ROOM).emit('alert:executed', result);
   emitStateUpdated(io, { reason, alertId: result.alert?.id ?? result.id });
 }
+
+/** Routing provider health (no PII): drives the citizen "offline mode" banner. */
+export function emitRoutingStatus(io, status) {
+  if (!io) return;
+  io.emit('routing:status', status);
+  emitStateUpdated(io, { reason: 'ROUTING_MODE_CHANGED', mode: status.mode });
+}

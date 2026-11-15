@@ -94,6 +94,15 @@ export function detectCapacityOverflow(currentOccupancy, capacity) {
 }
 
 /**
+ * A new >95% alert for a point is warranted if none was handled before, or if
+ * occupancy is now higher than when the operator last handled one.
+ */
+export function shouldRaiseCapacityAlert(currentPercent, lastHandledPercent) {
+  if (lastHandledPercent === null || lastHandledPercent === undefined) return true;
+  return currentPercent > lastHandledPercent;
+}
+
+/**
  * Evaluate SOS cluster conditions after a new SOS signal arrives.
  * Runs under a per-zone advisory lock so concurrent SOS requests can never
  * create duplicate ACTIVE alerts for the same zone.
@@ -213,6 +222,21 @@ export async function evaluateCapacityCrisis(assemblyPointId, io) {
       });
     }
 
+    // After an operator executed/dismissed an overflow alert for this point,
+    // re-raise only if occupancy climbs above the level they already handled.
+    const lastResolved = await tx.criticalAlert.findFirst({
+      where: {
+        alertType: 'CAPACITY_OVERFLOW',
+        assemblyPointId: point.id,
+        resolvedAt: { not: null },
+      },
+      orderBy: { resolvedAt: 'desc' },
+      select: { occupancyPercent: true },
+    });
+    if (!shouldRaiseCapacityAlert(overflow.occupancyPercent, lastResolved?.occupancyPercent)) {
+      return null;
+    }
+
     await tx.zone.update({
       where: { id: point.zoneId },
       data: { riskLevel: 'CRITICAL' },
@@ -233,6 +257,7 @@ export async function evaluateCapacityCrisis(assemblyPointId, io) {
     });
   });
 
+  if (!alert) return null;
   emitAlertCreated(io, alert, 'CAPACITY_OVERFLOW');
   return alert;
 }

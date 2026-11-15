@@ -1,13 +1,23 @@
 import { prisma } from '../config/db.js';
+import { notFound } from '../utils/errors.js';
 import { evaluateCapacityCrisis } from './crisisEngineService.js';
 import { calculateOccupancyPercent } from './geometryService.js';
+import { getRoutingGateway } from './routingGateway.js';
 
 /**
  * Fetch complete live operational snapshot for the Emergency Dispatcher Dashboard.
  */
 export async function getDispatcherDashboard() {
-  const [zones, assemblyPoints, sosSignals, rescueBrigades, roads, alerts] =
-    await Promise.all([
+  const [
+    zones,
+    assemblyPoints,
+    sosSignals,
+    rescueBrigades,
+    roads,
+    alerts,
+    safeSosCount,
+    safetyCheckInCount,
+  ] = await Promise.all([
       prisma.zone.findMany({ orderBy: { id: 'asc' } }),
       prisma.assemblyPoint.findMany({
         include: { zone: true },
@@ -31,6 +41,8 @@ export async function getDispatcherDashboard() {
         orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
         take: 30,
       }),
+      prisma.sosSignal.count({ where: { citizenStatus: 'SAFE' } }),
+      prisma.safetyCheckIn.count(),
     ]);
 
   const enrichedPoints = assemblyPoints.map((ap) => ({
@@ -72,7 +84,8 @@ export async function getDispatcherDashboard() {
     pendingSosCount: sosSignals.filter(
       (s) => s.citizenStatus === 'SOS' && s.status === 'PENDING'
     ).length,
-    safeConfirmationsCount: sosSignals.filter((s) => s.citizenStatus === 'SAFE').length,
+    // SOS closed by their owner + standalone "I am safe" check-ins
+    safeConfirmationsCount: safeSosCount + safetyCheckInCount,
     dispatchedBrigadesCount: rescueBrigades.filter((b) => b.status === 'DISPATCHED')
       .length,
     availableBrigadesCount: rescueBrigades.filter((b) => b.status !== 'DISPATCHED')
@@ -87,6 +100,7 @@ export async function getDispatcherDashboard() {
 
   return {
     summary,
+    routing: getRoutingGateway().getStatus(),
     zones: enrichedZones,
     assemblyPoints: enrichedPoints,
     sosSignals,
@@ -104,9 +118,7 @@ export async function updateRoadStatus(roadId, { status, closureReason }, io) {
     where: { id: Number(roadId) },
   });
   if (!existing) {
-    const err = new Error('Road segment not found');
-    err.statusCode = 404;
-    throw err;
+    throw notFound('ROAD_NOT_FOUND', 'Road segment not found');
   }
 
   const updated = await prisma.roadSegment.update({
@@ -139,9 +151,7 @@ export async function updateAssemblyPointOccupancy(
     where: { id: Number(pointId) },
   });
   if (!existing) {
-    const err = new Error('Assembly point not found');
-    err.statusCode = 404;
-    throw err;
+    throw notFound('ASSEMBLY_POINT_NOT_FOUND', 'Assembly point not found');
   }
 
   let nextOccupancy = existing.currentOccupancy;

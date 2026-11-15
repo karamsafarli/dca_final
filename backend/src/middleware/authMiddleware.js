@@ -19,7 +19,8 @@ export async function requireDispatcherAuth(req, res, next) {
 
     if (!payload?.sub) {
       return res.status(401).json({
-        error: 'Dispetçer autentifikasiyası tələb olunur',
+        error: 'Dispatcher authentication required',
+        code: 'AUTH_REQUIRED',
       });
     }
 
@@ -29,7 +30,8 @@ export async function requireDispatcherAuth(req, res, next) {
 
     if (!dispatcher || !dispatcher.isActive) {
       return res.status(401).json({
-        error: 'Sessiya etibarsızdır və ya hesab deaktiv edilib',
+        error: 'Session is invalid or the account is deactivated',
+        code: 'SESSION_INVALID',
       });
     }
 
@@ -50,7 +52,8 @@ export function checkLoginRateLimit(req, res, next) {
 
   if (entry && entry.resetAt > now && entry.count >= MAX_FAILED_ATTEMPTS) {
     return res.status(429).json({
-      error: 'Çox sayda uğursuz giriş cəhdi. Bir neçə dəqiqə sonra yenidən cəhd edin.',
+      error: 'Too many failed login attempts. Try again in a few minutes.',
+      code: 'RATE_LIMITED',
     });
   }
 

@@ -76,3 +76,37 @@ describe('SOS ownership — "I am safe" cannot be forged (IDOR)', () => {
     expect(victim.status).toBe('PENDING');
   });
 });
+
+describe('Priority #1 for citizens who cannot reach any assembly point', () => {
+  it('raises a standard citizen SOS to Priority #1 when transport is needed', async () => {
+    const res = await request(app).post('/api/citizen/sos').send({
+      citizenCode: 'CIT-TRAPPED',
+      hazardType: 'MEDICAL',
+      needsTransport: true,
+      zoneId: zone.id,
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.sos).toMatchObject({ priorityLevel: 1, citizenCategory: 'STANDARD' });
+  });
+});
+
+describe('"I am safe" without a prior SOS is a check-in, not a fake SOS', () => {
+  it('stores a SafetyCheckIn, creates no SOS record and is counted as a safe confirmation', async () => {
+    const auth = await dispatcherAuthHeader();
+    const before = await request(app).get('/api/dispatcher/dashboard').set('Authorization', auth);
+    const sosBefore = await prisma.sosSignal.count();
+
+    const res = await request(app)
+      .patch('/api/citizen/safe')
+      .send({ citizenCode: 'CIT-CHECKIN', zoneId: zone.id, lat: 40.39, lng: 49.82 });
+    expect(res.status).toBe(200);
+    expect(res.body.checkIn).toMatchObject({ citizenCode: 'CIT-CHECKIN', zoneId: zone.id, lat: 40.39 });
+
+    expect(await prisma.sosSignal.count()).toBe(sosBefore);
+    expect(await prisma.safetyCheckIn.count()).toBe(1);
+
+    const after = await request(app).get('/api/dispatcher/dashboard').set('Authorization', auth);
+    expect(after.body.summary.safeConfirmationsCount).toBe(before.body.summary.safeConfirmationsCount + 1);
+    expect(after.body.summary.activeSosCount).toBe(before.body.summary.activeSosCount);
+  });
+});

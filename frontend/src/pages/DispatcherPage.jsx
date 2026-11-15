@@ -108,6 +108,12 @@ export function DispatcherPage({ onAlertsCountChange }) {
         t('toastSimOccupancy', { percent: payload.targetPercent })
       );
     }
+    if (actionType === 'routing-api') {
+      return runAction(
+        () => crisisApi.setRoutingApiMode(payload.mode),
+        t(`toastSimRouting${payload.mode}`)
+      );
+    }
     if (actionType === 'reset') {
       return runAction(() => crisisApi.resetSimulation(), t('toastSimReset'));
     }
@@ -128,6 +134,7 @@ export function DispatcherPage({ onAlertsCountChange }) {
         zones={dashboard?.zones || []}
         roads={dashboard?.roads || []}
         assemblyPoints={dashboard?.assemblyPoints || []}
+        routing={dashboard?.routing}
         onRunAction={handleSimulationAction}
         isBusy={isBusy}
       />

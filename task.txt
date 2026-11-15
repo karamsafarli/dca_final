@@ -52,3 +52,9 @@ Challenge Drop #1 (Əlavə Alt-tapşırıq):
 Sisteme "Hereket Mehdudiyyetli sexs / xusisu qaygiya ehtiyaci olan vetendas" (prioritet SOS) rolu elave edilmelidir. Bu rola malik istifadeci SOS siqnali gonderdikde mwraciet avtomatik olaraq "Kritik Prioritet" (Priority #1) statusu almali ve sistem ona yalniz elil arabasi / tibbi neqliyyat ucun elcatan olan (panduslu ve maneesiz) texliyye marsrutu teyin etmelidir.
 
 Elave olaraq, butun istifadece interfeysi hem azerbaycan hem de ingilis dillerinde dinamik olaraq deyisdirile bilen (i18n) olmalidir.
+
+---
+Challenge Drop #2 (Əlavə Alt-tapşırıq):
+Vetendas modulunun istifade etdiyi Xarici Xerite ve Marsrutlasdirma API-si siradan cixmisdir (http 503 service unavailable xetasi qaytarir ve ya cavab muddeti 5 saniyeni kecir)
+
+Sistem bu xeta zamani cokmemeli (unhandled exception vermemeli), Circuit Breaker / Fallback mexanizmi avtomatik ise dusmeli ve mesafe/marsrut hesablamalarini local ehtiyat melumat bazasindan (statik koordinat matrisi ve ya son keslenmis marsrutlar) icra ederek istifadeciye "Oflayn / Ehtiyat marsrut rejiminde isleyir" bildirisi ile xidmet gostermeye davam etmelidir.

@@ -346,3 +346,43 @@ describe('Dispatcher Authentication & Authorization Security', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('No reachable / no step-free assembly point', () => {
+  const origin = { lat: 40.3749, lng: 49.8149 };
+  const onlyStairsShelter = [
+    {
+      id: 1,
+      name: 'Pilləkənli Sığınacaq',
+      type: 'SHELTER',
+      zoneId: 1,
+      nodeId: 2,
+      lat: 40.383,
+      lng: 49.815,
+      capacity: 500,
+      currentOccupancy: 10,
+      status: 'OPEN',
+      isWheelchairAccessible: false,
+    },
+  ];
+
+  it('flags NO_ACCESSIBLE_ROUTE for special-care citizens instead of returning nothing', () => {
+    const plan = evaluateEvacuationOptions(origin, onlyStairsShelter, MOCK_NODES, buildMockRoads(), {
+      accessibleOnly: true,
+    });
+    expect(plan.recommendedPoint).toBeNull();
+    expect(plan.assistanceRequired).toBe('NO_ACCESSIBLE_ROUTE');
+    expect(plan.rerouteReasons).toContain('NO_ACCESSIBLE_ROUTE');
+  });
+
+  it('flags NO_REACHABLE_POINT when every road to every point is closed', () => {
+    const allClosed = buildMockRoads(true).map((r) => ({ ...r, status: 'CLOSED' }));
+    const plan = evaluateEvacuationOptions(origin, onlyStairsShelter, MOCK_NODES, allClosed);
+    expect(plan.recommendedPoint).toBeNull();
+    expect(plan.assistanceRequired).toBe('NO_REACHABLE_POINT');
+  });
+
+  it('does not flag assistance when a route exists', () => {
+    const plan = evaluateEvacuationOptions(origin, onlyStairsShelter, MOCK_NODES, buildMockRoads());
+    expect(plan.assistanceRequired).toBeNull();
+  });
+});

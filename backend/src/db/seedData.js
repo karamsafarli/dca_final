@@ -433,6 +433,7 @@ export async function seedDatabase(prisma) {
 
   await prisma.$transaction(async (tx) => {
     await tx.criticalAlert.deleteMany();
+    await tx.safetyCheckIn.deleteMany();
     await tx.sosSignal.deleteMany();
     await tx.assemblyPoint.deleteMany();
     await tx.roadSegment.deleteMany();

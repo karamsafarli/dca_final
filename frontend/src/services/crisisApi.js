@@ -45,5 +45,7 @@ export const crisisApi = {
   simulateOccupancySpike: (payload = {}) =>
     api.post('/simulation/occupancy-spike', payload),
 
+  setRoutingApiMode: (mode) => api.post('/simulation/routing-api', { mode }),
+
   resetSimulation: () => api.post('/simulation/reset'),
 };

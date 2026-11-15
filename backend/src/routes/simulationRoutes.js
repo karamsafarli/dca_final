@@ -5,6 +5,7 @@ import {
   resetSystemSimulation,
   simulateOccupancySpike,
   simulateRoadToggle,
+  setRoutingApiSimulationMode,
   simulateSosBurst,
 } from '../services/simulationService.js';
 import { asyncHandler, validateBody } from '../utils/http.js';
@@ -59,6 +60,19 @@ router.post(
     const io = req.app.get('io');
     const result = await simulateOccupancySpike(req.validatedBody, io);
     res.json(result);
+  })
+);
+
+const routingApiModeSchema = z.object({
+  mode: z.enum(['HEALTHY', 'DOWN', 'SLOW']),
+});
+
+router.post(
+  '/simulation/routing-api',
+  validateBody(routingApiModeSchema),
+  asyncHandler(async (req, res) => {
+    const routing = await setRoutingApiSimulationMode(req.validatedBody.mode);
+    res.json({ mode: req.validatedBody.mode, routing });
   })
 );
 

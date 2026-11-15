@@ -9,6 +9,7 @@ import authRoutes from './routes/authRoutes.js';
 import citizenRoutes from './routes/citizenRoutes.js';
 import dispatcherRoutes from './routes/dispatcherRoutes.js';
 import simulationRoutes from './routes/simulationRoutes.js';
+import { getRoutingGateway } from './services/routingGateway.js';
 
 export function createApp() {
   const app = express();
@@ -29,10 +30,20 @@ export function createApp() {
   app.get('/api/health', async (_req, res, next) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
-      res.json({ status: 'ok', service: 'urban-crisis-engine', node: process.version });
+      const routing = getRoutingGateway().getStatus();
+      // A dead routing provider degrades the service, it does not take it down.
+      res.json({
+        status: routing.degraded ? 'degraded' : 'ok',
+        service: 'urban-crisis-engine',
+        dependencies: { database: 'ok', routingApi: routing.circuit.state },
+      });
     } catch (err) {
       next(err);
     }
+  });
+
+  app.get('/api/routing/status', (_req, res) => {
+    res.json(getRoutingGateway().getStatus());
   });
 
   app.use('/api', authRoutes);
@@ -41,7 +52,10 @@ export function createApp() {
   app.use('/api', simulationRoutes);
 
   app.use((req, res) => {
-    res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+    res.status(404).json({
+      error: `Route not found: ${req.method} ${req.originalUrl}`,
+      code: 'ROUTE_NOT_FOUND',
+    });
   });
 
   // eslint-disable-next-line no-unused-vars

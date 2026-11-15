@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { prisma } from '../config/db.js';
-import { emitSosCreated, emitSosUpdated } from '../realtime/events.js';
+import { emitSosCreated, emitSosUpdated, emitStateUpdated } from '../realtime/events.js';
 import { badRequest, forbidden, notFound, conflict } from '../utils/errors.js';
 import { claimBrigade } from './brigadeAllocation.js';
 import { evaluateSosCrisis } from './crisisEngineService.js';
@@ -61,7 +61,9 @@ export async function createSosSignal(payload, io) {
 
   const citizenCategory =
     payload.citizenCategory === 'SPECIAL_CARE' ? 'SPECIAL_CARE' : 'STANDARD';
-  const priorityLevel = citizenCategory === 'SPECIAL_CARE' ? 1 : 2;
+  // Priority #1: special-care citizens (Challenge Drop #1) and anyone who cannot
+  // reach an assembly point on their own and needs transport evacuation.
+  const priorityLevel = citizenCategory === 'SPECIAL_CARE' || payload.needsTransport ? 1 : 2;
 
   const citizenCode = payload.citizenCode?.trim() || `CIT-${crypto.randomUUID()}`;
   const accessToken = generateSosAccessToken();
@@ -102,8 +104,9 @@ export async function createSosSignal(payload, io) {
 /**
  * Update citizen safety status to SAFE ("Təhlükəsizəm").
  * - With `sosId`: closes that SOS, but only with its access token (ownership proof).
- * - With only `citizenCode`: records a standalone SAFE check-in and never touches
+ * - With only `citizenCode`: records a standalone SafetyCheckIn and never touches
  *   existing SOS records (a citizen code is not a secret).
+ * Returns `{ sos }` or `{ checkIn }`.
  */
 export async function markCitizenSafe({ sosId, accessToken, citizenCode, zoneId, lat, lng }, io) {
   if (sosId) {
@@ -139,7 +142,7 @@ export async function markCitizenSafe({ sosId, accessToken, citizenCode, zoneId,
     });
 
     emitSosUpdated(io, updated, 'CITIZEN_SAFE');
-    return updated;
+    return { sos: updated };
   }
 
   // Standalone SAFE check-in (no prior SOS from this device)
@@ -151,23 +154,17 @@ export async function markCitizenSafe({ sosId, accessToken, citizenCode, zoneId,
   zone = zone || zones[0];
   if (!zone) throw notFound('ZONE_NOT_FOUND', 'No zones configured');
 
-  const checkIn = await prisma.sosSignal.create({
+  const checkIn = await prisma.safetyCheckIn.create({
     data: {
       citizenCode,
-      citizenName: 'Vətəndaş',
-      hazardType: 'MEDICAL',
-      citizenStatus: 'SAFE',
       zoneId: zone.id,
       lat: lat !== undefined ? Number(lat) : zone.centerLat,
       lng: lng !== undefined ? Number(lng) : zone.centerLng,
-      status: 'RESOLVED',
-      notes: 'Vətəndaş özünü təhlükəsiz kimi təsdiqlədi',
     },
-    include: { zone: true },
   });
 
-  emitSosUpdated(io, checkIn, 'CITIZEN_SAFE');
-  return checkIn;
+  emitStateUpdated(io, { reason: 'CITIZEN_SAFE', checkInId: checkIn.id });
+  return { checkIn };
 }
 
 /**

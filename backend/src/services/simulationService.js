@@ -1,7 +1,9 @@
 import { prisma } from '../config/db.js';
 import { seedDatabase } from '../db/seedData.js';
 import { updateAssemblyPointOccupancy, updateRoadStatus } from './dispatcherService.js';
+import { AppError, notFound } from '../utils/errors.js';
 import { getEvacuationPlan } from './evacuationService.js';
+import { getRoutingGateway } from './routingGateway.js';
 import { createSosSignal } from './sosService.js';
 
 /**
@@ -89,9 +91,7 @@ export async function simulateRoadToggle(
   }
 
   if (!road) {
-    const err = new Error('Road segment not found');
-    err.statusCode = 404;
-    throw err;
+    throw notFound('ROAD_NOT_FOUND', 'Road segment not found');
   }
 
   return updateRoadStatus(
@@ -125,9 +125,7 @@ export async function simulateOccupancySpike(
   }
 
   if (!point) {
-    const err = new Error('Open assembly point not found');
-    err.statusCode = 404;
-    throw err;
+    throw notFound('ASSEMBLY_POINT_NOT_FOUND', 'Open assembly point not found');
   }
 
   return updateAssemblyPointOccupancy(
@@ -142,8 +140,33 @@ export async function simulateOccupancySpike(
  */
 export async function resetSystemSimulation(io) {
   await seedDatabase(prisma);
+  const gateway = getRoutingGateway();
+  await gateway.client.setSimulationMode('HEALTHY').catch(() => {});
+  gateway.reset();
   if (io) {
     io.emit('state:updated', { reason: 'SYSTEM_RESET' });
   }
   return { reset: true };
+}
+
+/**
+ * Challenge Drop #2 demo: switch the simulated external routing API into a
+ * fault mode (DOWN = HTTP 503, SLOW = > 5 s) or back to HEALTHY.
+ */
+export async function setRoutingApiSimulationMode(mode) {
+  const gateway = getRoutingGateway();
+  try {
+    await gateway.client.setSimulationMode(mode);
+  } catch (err) {
+    throw new AppError(
+      502,
+      'ROUTING_API_CONTROL_FAILED',
+      `Could not reach the simulated routing API control endpoint: ${err.message}`
+    );
+  }
+  if (mode === 'HEALTHY') {
+    // Do not wait for the next probe: close the circuit so citizens go back online now.
+    gateway.reset();
+  }
+  return gateway.getStatus();
 }

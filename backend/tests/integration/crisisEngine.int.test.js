@@ -210,3 +210,31 @@ describe('Manual brigade dispatch', () => {
     expect(res.status).toBe(409);
   });
 });
+
+describe('>95% capacity alert after an operator decision', () => {
+  it('does not re-raise for the same occupancy, but does when occupancy keeps rising', async () => {
+    const auth = await dispatcherAuthHeader();
+    const point = await prisma.assemblyPoint.findFirstOrThrow({ where: { status: 'OPEN' } });
+    const spike = (occupancyPercent) =>
+      request(app)
+        .patch(`/api/dispatcher/shelters/${point.id}/occupancy`)
+        .set('Authorization', auth)
+        .send({ occupancyPercent });
+    const active = () =>
+      prisma.criticalAlert.findMany({
+        where: { alertType: 'CAPACITY_OVERFLOW', assemblyPointId: point.id, status: 'ACTIVE' },
+      });
+
+    const first = await spike(97);
+    expect(first.body.triggeredAlert?.status).toBe('ACTIVE');
+    await request(app)
+      .post(`/api/dispatcher/alerts/${first.body.triggeredAlert.id}/execute`)
+      .set('Authorization', auth);
+
+    await spike(97);
+    expect(await active()).toHaveLength(0);
+
+    await spike(99);
+    expect(await active()).toHaveLength(1);
+  });
+});

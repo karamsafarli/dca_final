@@ -95,6 +95,15 @@ export const TRANSLATIONS = {
     rerouteBannerTitle: 'Avtomatik Alternativ Təxliyə Marşrutu Aktivləşdirildi',
     rerouteRoadClosure:
       'Bağlı yol ({roads}) aşkarlandığı üçün təhlükəsiz yan keçid marşrutu quruldu.',
+    assistanceNoAccessibleTitle: 'Maneəsiz (panduslu) marşrut tapılmadı',
+    assistanceNoAccessibleBody:
+      'Hazırda heç bir açıq toplanış məntəqəsinə əlil arabası ilə keçilə bilən yol yoxdur. Olduğunuz yerdə təhlükəsiz qalın və tibbi nəqliyyat tələb edin.',
+    assistanceNoReachableTitle: 'Əlçatan toplanış məntəqəsi yoxdur',
+    assistanceNoReachableBody:
+      'Bütün yollar bağlıdır və ya məntəqələr əlçatan deyil. Olduğunuz yerdə təhlükəsiz qalın və xilasetmə tələb edin.',
+    assistanceRequestBtn: 'Tibbi nəqliyyat / xilasetmə tələb et (Prioritet SOS)',
+    assistanceSosNote: 'Maneəsiz/əlçatan marşrut tapılmadı — nəqliyyatla təxliyə tələb olunur',
+    rerouteAllHigh: 'Bütün yaxın məntəqələr 90%-dən doludur — ən az dolu məntəqə seçildi.',
     rerouteOccupancy90:
       '{name} doluluğu {percent}% (≥90%) olduğu üçün avtomatik olaraq növbəti təhlükəsiz məntəqə seçildi.',
     rerouteAccessibility:
@@ -185,6 +194,61 @@ export const TRANSLATIONS = {
     peopleUnit: 'nəfər',
     openPointBtn: 'Məntəqəni Aç',
     brigadesTitle: 'Aktiv və Ehtiyat Xilasetmə Briqadaları ({count})',
+
+    // Routing provider resilience (Challenge Drop #2)
+    routingOfflineTitle: 'Oflayn / Ehtiyat marşrut rejimində işləyir',
+    routingModeFALLBACK_CACHE:
+      'Xarici xəritə və marşrut xidməti əlçatan deyil. Bu ünvan üçün son keşlənmiş marşrut göstərilir ({time} saxlanılıb).',
+    routingModeFALLBACK_LOCAL_GRAPH:
+      'Xarici xəritə və marşrut xidməti əlçatan deyil. Marşrut yerli ehtiyat yol bazası üzrə hesablanıb.',
+    routingModeFALLBACK_STRAIGHT_LINE:
+      'Xarici xəritə və marşrut xidməti əlçatan deyil. Məsafələr statik koordinat matrisi üzrə (düz xətt) təxmini hesablanıb.',
+    routingReasonEXTERNAL_UNAVAILABLE: 'Səbəb: xidmət HTTP 503 qaytarır',
+    routingReasonEXTERNAL_TIMEOUT: 'Səbəb: cavab müddəti 5 saniyəni keçdi',
+    routingReasonCIRCUIT_OPEN: 'Səbəb: qoruyucu mexanizm (circuit breaker) aktivdir',
+    routingReasonEXTERNAL_UNREACHABLE: 'Səbəb: xidmətə qoşulmaq mümkün deyil',
+    routingReasonINVALID_RESPONSE: 'Səbəb: xidmət yanlış cavab qaytardı',
+    routingReasonEXTERNAL_ERROR: 'Səbəb: xidmət xətası',
+    routingOfflineFooter:
+      'Təxliyə xidməti dayanmır. Xidmət bərpa olunduqda sistem avtomatik onlayn rejimə qayıdacaq.',
+    toastRoutingOffline: 'Xarici marşrut xidməti əlçatan deyil — ehtiyat marşrut rejiminə keçildi.',
+    toastRoutingOnline: 'Xarici marşrut xidməti bərpa olundu — onlayn rejim.',
+    routingApiLabel: 'Marşrut API',
+    routingApiOnline: 'Onlayn',
+    routingApiDegraded: 'Ehtiyat rejim',
+    simRoutingDown: 'API: 503',
+    simRoutingSlow: 'API: >5 san',
+    simRoutingHealthy: 'API: Bərpa et',
+    toastSimRoutingDOWN: 'Simulyasiya: xarici marşrut API-si HTTP 503 qaytarır.',
+    toastSimRoutingSLOW: 'Simulyasiya: xarici marşrut API-si 5 saniyədən gec cavab verir.',
+    toastSimRoutingHEALTHY: 'Simulyasiya: xarici marşrut API-si bərpa olundu.',
+
+    // API error codes (backend returns `code`, UI translates it)
+    errors: {
+      VALIDATION_ERROR: 'Daxil edilən məlumat yanlışdır.',
+      ROUTE_NOT_FOUND: 'Sorğu ünvanı tapılmadı.',
+      NOT_FOUND: 'Məlumat tapılmadı.',
+      INTERNAL_ERROR: 'Serverdə gözlənilməz xəta baş verdi.',
+      NETWORK_ERROR: 'Serverlə əlaqə yoxdur. İnternet bağlantınızı yoxlayın.',
+      AUTH_REQUIRED: 'Dispetçer autentifikasiyası tələb olunur.',
+      SESSION_INVALID: 'Sessiya etibarsızdır və ya hesab deaktiv edilib.',
+      RATE_LIMITED: 'Çox sayda cəhd. Bir neçə dəqiqə sonra yenidən cəhd edin.',
+      INVALID_CREDENTIALS: 'İstifadəçi adı və ya şifrə yanlışdır.',
+      LOCATION_REQUIRED: 'Rayon və ya koordinat seçilməlidir.',
+      SOS_NOT_FOUND: 'SOS siqnalı tapılmadı.',
+      SOS_ACCESS_DENIED: 'Bu SOS siqnalını yeniləmək icazəniz yoxdur.',
+      SOS_ALREADY_RESOLVED: 'Bu SOS artıq bağlanıb.',
+      BRIGADE_NOT_FOUND: 'Briqada tapılmadı.',
+      BRIGADE_BUSY: 'Bu briqada artıq başqa tapşırıqdadır.',
+      NO_BRIGADE_AVAILABLE: 'Hazırda boş xilasetmə briqadası yoxdur.',
+      ALERT_NOT_FOUND: 'Həyəcan siqnalı tapılmadı.',
+      ALERT_DISMISSED: 'Bağlanmış həyəcan icra edilə bilməz.',
+      ALERT_NOT_ACTIVE: 'Yalnız aktiv həyəcan bağlana bilər.',
+      ROAD_NOT_FOUND: 'Yol seqmenti tapılmadı.',
+      ASSEMBLY_POINT_NOT_FOUND: 'Toplanış məntəqəsi tapılmadı.',
+      ZONE_NOT_FOUND: 'Zona tapılmadı.',
+      ROUTING_API_CONTROL_FAILED: 'Simulyasiya olunmuş marşrut API-sinə qoşulmaq mümkün olmadı.',
+    },
 
     // Toasts
     toastWelcome: 'Xoş gəldiniz, {name}',
@@ -313,6 +377,15 @@ export const TRANSLATIONS = {
     rerouteBannerTitle: 'Automatic Alternative Evacuation Route Activated',
     rerouteRoadClosure:
       'Closed road ({roads}) detected — safe detour corridor computed automatically.',
+    assistanceNoAccessibleTitle: 'No step-free (ramp) route available',
+    assistanceNoAccessibleBody:
+      'No open assembly point can currently be reached by wheelchair. Stay where you are if it is safe and request medical transport.',
+    assistanceNoReachableTitle: 'No reachable assembly point',
+    assistanceNoReachableBody:
+      'All roads are closed or no point can be reached. Stay where you are if it is safe and request rescue.',
+    assistanceRequestBtn: 'Request medical transport / rescue (Priority SOS)',
+    assistanceSosNote: 'No step-free/reachable route found — transport evacuation required',
+    rerouteAllHigh: 'All nearby points are above 90% — the least crowded one was chosen.',
     rerouteOccupancy90:
       '{name} reached {percent}% occupancy (≥90%) — automatically redirected to the next safe point.',
     rerouteAccessibility:
@@ -403,6 +476,61 @@ export const TRANSLATIONS = {
     peopleUnit: 'people',
     openPointBtn: 'Open Point',
     brigadesTitle: 'Active & Reserve Rescue Brigades ({count})',
+
+    // Routing provider resilience (Challenge Drop #2)
+    routingOfflineTitle: 'Running in offline / backup route mode',
+    routingModeFALLBACK_CACHE:
+      'The external map & routing service is unavailable. Showing the last cached route for this location (saved {time}).',
+    routingModeFALLBACK_LOCAL_GRAPH:
+      'The external map & routing service is unavailable. Your route was calculated from the local backup road database.',
+    routingModeFALLBACK_STRAIGHT_LINE:
+      'The external map & routing service is unavailable. Distances are estimated from the static coordinate matrix (straight line).',
+    routingReasonEXTERNAL_UNAVAILABLE: 'Reason: the service returns HTTP 503',
+    routingReasonEXTERNAL_TIMEOUT: 'Reason: response time exceeded 5 seconds',
+    routingReasonCIRCUIT_OPEN: 'Reason: circuit breaker is open',
+    routingReasonEXTERNAL_UNREACHABLE: 'Reason: the service cannot be reached',
+    routingReasonINVALID_RESPONSE: 'Reason: the service returned an invalid response',
+    routingReasonEXTERNAL_ERROR: 'Reason: service error',
+    routingOfflineFooter:
+      'Evacuation guidance continues. The system switches back to online mode automatically once the service recovers.',
+    toastRoutingOffline: 'External routing service unavailable — switched to backup route mode.',
+    toastRoutingOnline: 'External routing service restored — back online.',
+    routingApiLabel: 'Routing API',
+    routingApiOnline: 'Online',
+    routingApiDegraded: 'Backup mode',
+    simRoutingDown: 'API: 503',
+    simRoutingSlow: 'API: >5 s',
+    simRoutingHealthy: 'API: Restore',
+    toastSimRoutingDOWN: 'Simulation: external routing API now returns HTTP 503.',
+    toastSimRoutingSLOW: 'Simulation: external routing API now responds after 5+ seconds.',
+    toastSimRoutingHEALTHY: 'Simulation: external routing API restored.',
+
+    // API error codes (backend returns `code`, UI translates it)
+    errors: {
+      VALIDATION_ERROR: 'The submitted data is invalid.',
+      ROUTE_NOT_FOUND: 'Request address not found.',
+      NOT_FOUND: 'Not found.',
+      INTERNAL_ERROR: 'An unexpected server error occurred.',
+      NETWORK_ERROR: 'Cannot reach the server. Check your internet connection.',
+      AUTH_REQUIRED: 'Dispatcher authentication required.',
+      SESSION_INVALID: 'Session is invalid or the account is deactivated.',
+      RATE_LIMITED: 'Too many attempts. Try again in a few minutes.',
+      INVALID_CREDENTIALS: 'Invalid username or password.',
+      LOCATION_REQUIRED: 'Select a district or a coordinate.',
+      SOS_NOT_FOUND: 'SOS signal not found.',
+      SOS_ACCESS_DENIED: 'You are not allowed to update this SOS.',
+      SOS_ALREADY_RESOLVED: 'This SOS is already resolved.',
+      BRIGADE_NOT_FOUND: 'Brigade not found.',
+      BRIGADE_BUSY: 'This brigade is already on another mission.',
+      NO_BRIGADE_AVAILABLE: 'No rescue brigade is available right now.',
+      ALERT_NOT_FOUND: 'Alert not found.',
+      ALERT_DISMISSED: 'A dismissed alert cannot be executed.',
+      ALERT_NOT_ACTIVE: 'Only active alerts can be dismissed.',
+      ROAD_NOT_FOUND: 'Road segment not found.',
+      ASSEMBLY_POINT_NOT_FOUND: 'Assembly point not found.',
+      ZONE_NOT_FOUND: 'Zone not found.',
+      ROUTING_API_CONTROL_FAILED: 'Could not reach the simulated routing API.',
+    },
 
     // Toasts
     toastWelcome: 'Welcome, {name}',
