@@ -59,6 +59,7 @@ export function ShelterRoadControl({ assemblyPoints = [], roads = [], onUpdateOc
                 <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-subtle">
                   <div className={cn('h-full rounded-full', tone.bar)} style={{ width: `${Math.min(100, percent)}%` }} />
                 </div>
+                {onUpdateOccupancy && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {point.status === 'STANDBY' ? (
                     <Button size="sm" variant="ink" disabled={isBusy} onClick={() => onUpdateOccupancy(point.id, { status: 'OPEN' })}>
@@ -78,6 +79,7 @@ export function ShelterRoadControl({ assemblyPoints = [], roads = [], onUpdateOc
                     ))
                   )}
                 </div>
+                )}
               </li>
             );
           })}
@@ -98,11 +100,13 @@ export function ShelterRoadControl({ assemblyPoints = [], roads = [], onUpdateOc
                   )}
                 </div>
               </div>
+              {onUpdateRoadStatus && (
               <Segmented
                 value={road.status}
                 onChange={(st) => !isBusy && st !== road.status && onUpdateRoadStatus(road.id, { status: st })}
                 options={['OPEN', 'CONGESTED', 'CLOSED'].map((st) => ({ value: st, label: t(`roadStatuses.${st}`) }))}
               />
+              )}
             </li>
           ))}
         </ul>

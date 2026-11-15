@@ -1,6 +1,7 @@
 import { CRISIS_THRESHOLDS } from '../config/constants.js';
 import { lockKey, prisma } from '../config/db.js';
 import { emitAlertCreated, emitAlertResolved } from '../realtime/events.js';
+import { createCoalescer } from '../resilience/coalesce.js';
 import { conflict, notFound } from '../utils/errors.js';
 import { claimBrigade } from './brigadeAllocation.js';
 import {
@@ -181,6 +182,22 @@ export async function evaluateSosCrisis(triggerSos, io) {
   if (!outcome) return null;
   emitAlertCreated(io, outcome.alert, 'SOS_CLUSTER');
   return outcome.alert;
+}
+
+/**
+ * Flood-safe entry point used by the SOS endpoint (Challenge Drop #3).
+ * Evaluations are coalesced per zone (one running + one queued), and a failure
+ * of the analytics never fails an SOS that is already stored.
+ */
+const sosEvaluationCoalescer = createCoalescer(async ({ sos, io }) => evaluateSosCrisis(sos, io));
+
+export async function scheduleSosEvaluation(sos, io) {
+  try {
+    return await sosEvaluationCoalescer(sos.zoneId, { sos, io });
+  } catch (err) {
+    console.error('Crisis evaluation failed (SOS is stored, will be re-evaluated on the next signal):', err.message);
+    return null;
+  }
 }
 
 /**

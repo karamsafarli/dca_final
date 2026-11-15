@@ -46,6 +46,32 @@ Hər drop üçün: tələb, dizayn qərarı, dəyişən fayllar, testlər və ne
 
 ---
 
+## Drop #3 — SOS flood / spam hücumu (500+ eyni anda), RBAC, < 300 ms
+
+**Tələb:** rate limiting + dublikat filtrasiyası (saxta sorğular dispetçer panelini bloklamamalı), briqada yönləndirmənin JWT / RBAC ilə qorunması, kütləvi sorğularda orta gecikmə < 300 ms.
+
+**Əvvəlcə ölçdük** (`loadtest/sosFlood.js`): 600 eyni anda SOS → orta **1526 ms**; dublikat fırtınası **355 təkrar qeyd və 245 HTTP 500** (Prisma `P2028`: hər SOS zona lock-unu gözləyən tranzaksiyada pool bağlantısını tutur → pool tükənir); dispetçer paneli p95 2.2 s. Rate limiting tək mənbəni artıq kəsirdi.
+
+**Dizayn qərarları**
+- **Çoxqatlı rate limit:** nginx `limit_req` (2 r/s, burst 10) + `express-rate-limit` (10/dəq). nginx `X-Forwarded-For`-u üzərinə yazır, backend portu `127.0.0.1`-ə bağlıdır → IP saxtalaşdırması ilə limitdən yayınmaq olmur.
+- **Dublikat filtri:** açar = vətəndaş + təhlükə növü (2 dəq). Eyni anda gələnlər `singleFlight` ilə bir əməliyyata birləşir; sonrakılar mövcud SOS-u qaytarır (`200 duplicate:true`, token yalnız yaradana). Yaddaşdaxili indeks yeni vətəndaşlar üçün DB sorğusunu atlayır; restartdan sonra 2 dəq DB yoxlanılır.
+- **Coalesced böhran qiymətləndirməsi:** zona üzrə 1 işləyən + 1 növbədə; növbədəki run əvvəl commit olunmuş bütün siqnalları görür → nəticə eynidir, iş 500 → ~2. Xəta SOS-u itirmir.
+- **Gecikmə büdcəsi (30 ms):** cavab qiymətləndirməni yalnız büdcə daxilində gözləyir; Qırmızı Həyəcan hər halda Socket.IO ilə çatır (yük testindən sonra hər zonada 1 həyəcan yarandığı yoxlanıldı).
+- **Hot path optimallaşdırması:** zona keşi, `create` zamanı əlavə JOIN-lərin aradan qaldırılması, Prisma pool 40, istehsalda yalnız xətaların loglanması.
+- **Panel bloklanmır:** dispetçer yenilənməsi throttle (1/s, trailing), bildirişlər toplanır, ictimai `state:updated` 500 ms paketlərlə; App səviyyəsində hər hadisədə tam dashboard sorğusu silindi.
+- **RBAC:** `OBSERVER` / `DISPATCHER` / `COMMANDER` icazə matrisi (`config/permissions.js`), `requirePermission` hər kritik route-da, rol hər sorğuda bazadan, JWT `iss`/`aud`, `403 FORBIDDEN` + audit log; UI icazələrə görə düymələri gizlədir; sistem sıfırlama yalnız COMMANDER.
+- **Müşahidə edilə bilən SLO:** `Server-Timing` başlığı, `GET /api/metrics/latency`, konsolda canlı gecikmə göstəricisi.
+
+**Fayllar:** `frontend/nginx.conf`, `docker-compose.yml`, `backend/src/resilience/coalesce.js`, `services/sosService.js`, `services/zoneCache.js`, `services/crisisEngineService.js`, `realtime/events.js`, `config/permissions.js`, `middleware/authMiddleware.js`, `middleware/latencyMetrics.js`, `routes/*`, `prisma/schema.prisma` (`OBSERVER`, indeks), `loadtest/sosFlood.js`, `frontend/src/lib/throttle.js`, `pages/DispatcherPage.jsx`, `KpiStatsGrid.jsx`.
+
+**Testlər:** `integration/sosFlood.int.test.js` (600 eyni anda SOS: 0 xəta, server orta < 300 ms, zona başına 1 həyəcan; 500 dublikat → 1 qeyd; isti indeks yolu; daşqın zamanı briqada göndərmə), `integration/rbac.int.test.js` (observer 6 kritik əməliyyatda 403, rol bazadan, deaktiv hesab), `unit/floodProtection.test.js`, `frontend lib/throttle.test.js`, `SosFeedList.test.jsx`, `RedAlertBanner.test.jsx`.
+
+**Ölçülmüş nəticə** (isinmədən sonra, Docker şəbəkəsi, 3 ardıcıl run): botnet orta **252 / 166 / 141 ms**, server tərəfi ~40 ms; dublikat fırtınası 1 qeyd; tək mənbə 590–600 × 429; dashboard ~25–45 ms; briqada göndərmə 4–6 ms. Qeyd: ilk soyuq run (JIT isinmədən) 312 ms idi — buna görə yük testinə standart isinmə fazası əlavə olundu.
+
+**Demo:** Dispetçer → "Demo ssenariləri" yox, terminaldan `cd backend && npm run loadtest` → konsolda "SOS API gecikməsi" göstəricisi və toplanmış bildirişlər; `observer` ilə daxil olub "Yalnız baxış rejimi"-ni göstərin.
+
+---
+
 ## Növbəti drop-lar üçün hazırlıq
 - Hədlər `config/constants.js`-də (bir sətir dəyişiklik).
 - Yeni xarici asılılıq → eyni `CircuitBreaker` sinfi ilə bükülür.

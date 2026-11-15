@@ -80,7 +80,9 @@ enum AlertStatus {
   DISMISSED
 }
 
+/// RBAC (Challenge Drop #3): permissions per role live in src/config/permissions.js
 enum DispatcherRole {
+  OBSERVER
   DISPATCHER
   COMMANDER
 }
@@ -235,6 +237,7 @@ model SosSignal {
   @@index([zoneId, createdAt])
   @@index([citizenStatus, createdAt])
   @@index([priorityLevel, createdAt])
+  @@index([citizenCode, createdAt])
   @@map("sos_signals")
 }
 

@@ -59,6 +59,10 @@ Bu sənəd **"Urban Crisis & Crowd Evacuation Engine"** hakaton layihəsinin haz
 - **AI-nin rolu:** `express-rate-limit` (SOS və uğursuz giriş), JWT-nin cavab gövdəsindən çıxarılması, Docker sərtləşdirmə (root olmayan istifadəçi, healthcheck), sərhəd-dəyər testləri (500 m / 501 m, 90%, 95.0% / 95.2%), demo ssenari testləri, coverage hədləri, GitHub Actions CI, vətəndaş ekranının "əvvəl cavab" düzümü və mobil SOS paneli, `TESTING.md`, `SECURITY.md`, `DEMO_SCRIPT.md`.
 - **İnsan nəzarəti və yoxlama:** Komanda vaxt məhdudiyyətinə görə brauzer e2e testlərini əhatədən çıxardı. `npm audit fix` Prisma CLI-ni klientdən fərqli versiyaya endirdikdə bu aşkarlanıb geri qaytarıldı; qalan iki tövsiyə (zod 4, deepmerge-ts) major yeniləmə tələb etdiyi üçün sənədləşdirildi. Sənədlərdəki hər iddia koda qarşı yoxlanıldı (məs. "5 s timeout" iddiası üçün ayrıca test əlavə edildi).
 
+### Mərhələ 10: Challenge Drop #3 — SOS flood, RBAC, < 300 ms (Claude Code)
+- **AI-nin rolu:** mövcud müdafiənin boşluq analizi; asılılıqsız yük testi (`loadtest/sosFlood.js`) ilə **əvvəlcə ölçmə**; Prisma `P2028` pool tükənməsinin kök səbəbinin tapılması; coalesced qiymətləndirmə, single-flight dublikat filtri, gecikmə büdcəsi, nginx `limit_req`, RBAC icazə matrisi, `Server-Timing` + `/api/metrics/latency`, panelin throttle ilə yenilənməsi.
+- **İnsan nəzarəti və yoxlama:** hər optimallaşdırmadan sonra eyni yük testi təkrar edildi (1526 → 383 → 321/280 → 252/166/141 ms); ilk soyuq run-ın (312 ms) JIT isinməsi olduğu aşkarlandıqdan sonra standart isinmə fazası əlavə edildi və bu sənəddə açıq qeyd olundu. Test prosesinin 600 xam TCP bağlantısını aça bilməməsi (macOS backlog 128) ölçmə xətası kimi tanındı və inteqrasiya testi server tərəfi gecikməni (`Server-Timing`) yoxlayacaq şəkildə dəyişdirildi. Davranış dəyişikliyi (təkrar SOS artıq `200 duplicate`) köhnə testdə bilərəkdən yeniləndi.
+
 ### AI istifadəsində nəzarət prinsiplərimiz
 1. **Test-first:** AI-nin hər xəta düzəlişi əvvəlcə uğursuz test, sonra kod ilə edildi.
 2. **Real mühitdə yoxlama:** kritik iddialar (race condition, 5 s timeout, provayder çöküşü) real PostgreSQL, real HTTP və brauzerdə ölçüldü.

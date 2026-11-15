@@ -15,7 +15,8 @@
     "test:all": "npm test && npm run test:integration",
     "routing-api": "node src/external/routingApiServer.js",
     "routing-api:dev": "node --watch src/external/routingApiServer.js",
-    "test:coverage": "VITEST_ALL=1 vitest run --config vitest.integration.config.js --coverage"
+    "test:coverage": "VITEST_ALL=1 vitest run --config vitest.integration.config.js --coverage",
+    "loadtest": "node loadtest/sosFlood.js"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",

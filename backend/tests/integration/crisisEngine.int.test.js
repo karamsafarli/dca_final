@@ -48,11 +48,21 @@ beforeEach(async () => {
 });
 
 describe('Critical Crisis Algorithm — 4 distinct SOS in 5 min / 500 m', () => {
-  it('does NOT raise a Red Alert when one citizen sends SOS four times', async () => {
+  it('does NOT raise a Red Alert when one citizen sends SOS four times (merged as duplicates)', async () => {
+    const statuses = [];
     for (let i = 0; i < 4; i += 1) {
       const res = await sendSos('CIT-SAME-PERSON', i);
-      expect(res.status).toBe(201);
+      statuses.push(res.status);
       expect(res.body.triggeredAlert).toBeNull();
+    }
+    expect(statuses).toEqual([201, 200, 200, 200]);
+    expect(await prisma.sosSignal.count({ where: { citizenCode: 'CIT-SAME-PERSON' } })).toBe(1);
+    expect(await activeClusterAlerts()).toHaveLength(0);
+  });
+
+  it('a citizen sending 4 DIFFERENT hazards is still one person for the Red Alert rule', async () => {
+    for (const [i, hazardType] of ['FIRE', 'COLLAPSE', 'FLOOD', 'MEDICAL'].entries()) {
+      expect((await sendSos('CIT-ONE-PERSON', i, { hazardType })).status).toBe(201);
     }
     expect(await activeClusterAlerts()).toHaveLength(0);
   });

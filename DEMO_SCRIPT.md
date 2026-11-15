@@ -5,7 +5,7 @@
 docker compose up --build -d
 ```
 - Brauzer pəncərəsi 1: http://localhost:3000/ (Vətəndaş) — telefon görünüşü üçün DevTools mobil rejimi.
-- Brauzer pəncərəsi 2: http://localhost:3000/dispatcher — `dispatcher1` ilə giriş (parol README-də).
+- Brauzer pəncərəsi 2: http://localhost:3000/dispatcher — `commander` ilə giriş (Sıfırla yalnız COMMANDER-ə açıqdır; parollar README-də).
 - Dispetçer panelində **"Demo ssenariləri"** zolağını açın və **Sıfırla** basın.
 
 | Vaxt | Addım | Nə göstəririk | Nə deyirik |
@@ -18,13 +18,20 @@ docker compose up --build -d
 | 2:30 | **Təsdiqlə və İcra Et** | Briqada göndərildi + ehtiyat məntəqə açıldı | "Bir klik, atomik tranzaksiya; iki dispetçer eyni anda kliklərsə də bir briqada gedir — testlə sübut." |
 | 3:00 | Drop #1 | Vətəndaş → "Xüsusi Qayğı" → maneəsiz marşrut; SOS → dispetçerdə Prioritet #1; `EN` keçidi | "Pilləkənli yollar qrafdan çıxarılır; marşrut olmasa, 1 kliklə tibbi nəqliyyat." |
 | 3:45 | Drop #2 | **API: 503** → vətəndaşda "Oflayn / Ehtiyat marşrut rejimi"; **API: Bərpa et** | "Circuit Breaker: 5 s timeout, keş → lokal qraf → koordinat matrisi. Sistem çökmür." |
-| 4:30 | Keyfiyyət | `TESTING.md`, CI | "117 avtomatik test, 91.6% coverage, real PostgreSQL inteqrasiya testləri, hər push-da CI." |
+| 4:15 | Drop #3 | Terminal: `cd backend && npm run loadtest` → konsolda "SOS API gecikməsi" və "N yeni SOS" toplu bildirişi; ayrıca pəncərədə `observer` → "Yalnız baxış rejimi" | "600 eyni anda saxta SOS: orta ~150–250 ms, 500-lük dublikat fırtınası tək qeyd, panel bloklanmır; briqada göndərmə yalnız icazəli rolla." |
+| 4:40 | Keyfiyyət | `TESTING.md`, CI | "151 avtomatik test, 92% coverage, real PostgreSQL inteqrasiya testləri, hər push-da CI." |
 
 **Ehtiyat plan:** internet yoxdursa xəritə plitələri görünməyə bilər — marşrut kartı və dispetçer siyahıları yenə işləyir. Drop #2-ni real çöküşlə göstərmək üçün: `docker compose stop routing-api`.
 
 ---
 
 ## Gözlənilən suallar
+
+**500 saxta SOS paneli necə bloklamır?** Dörd qat: nginx və tətbiq rate limit, dublikatların birləşdirilməsi (500 → 1 qeyd), zona üzrə coalesced qiymətləndirmə (500 → ~2), panelin saniyədə 1 dəfə yenilənməsi. Yük testi: botnet orta 141–252 ms, dispetçer əməliyyatları 4–45 ms.
+
+**Bot IP-ni dəyişdirərək limiti keçə bilərmi?** `X-Forwarded-For`-u nginx üzərinə yazır və backend portu yalnız localhost-dadır — başlıq saxtalaşdırması işləmir. Minlərlə real IP-dən gələn paylanmış hücuma qarşı: dublikat filtri + 4 fərqli vətəndaş qaydası; növbəti addım telefon doğrulaması.
+
+**Niyə RBAC rolu token-dən yox, bazadan oxunur?** Hesab deaktiv edildikdə və ya rolu endirildikdə dərhal qüvvəyə minsin deyə — testlə sübut olunub.
 
 **Niyə PostGIS yox, yaddaşda Dijkstra?** Prototip qrafı kiçikdir (millisaniyələr); qərar məntiqi marşrut mənbəyindən ayrıdır, ona görə PostGIS/OSRM-ə keçid yalnız gateway səviyyəsində dəyişiklikdir.
 

@@ -55,7 +55,7 @@ export function SosFeedList({ zones = [], sosSignals = [], onDispatch, isBusy })
                       <span className="text-xs text-faint tabular">{formatTimeAgo(sos.createdAt, lang)}</span>
                     </div>
                   </div>
-                  {!isSafe && sos.status === 'PENDING' && (
+                  {onDispatch && !isSafe && sos.status === 'PENDING' && (
                     <Button variant="ink" size="sm" disabled={isBusy} onClick={() => onDispatch(sos.id)}>
                       <Send className="h-3.5 w-3.5" aria-hidden="true" />
                       {t('dispatchBrigadeBtn')}

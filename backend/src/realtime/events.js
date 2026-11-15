@@ -1,3 +1,5 @@
+import { SOS_FLOOD_CONFIG } from '../config/constants.js';
+
 /**
  * Central catalogue of Socket.IO rooms and events.
  *
@@ -31,9 +33,34 @@ export function emitStateUpdated(io, payload) {
   io?.emit('state:updated', payload);
 }
 
+/**
+ * Public "SOS created" notifications are batched: during a flood every
+ * connected citizen would otherwise receive hundreds of events per second.
+ * Dispatchers still get each `sos:created` in their private room.
+ */
+const publicBatches = new WeakMap(); // io -> { count, timer }
+
+function emitBatchedSosCreated(io) {
+  if (!io) return;
+  let batch = publicBatches.get(io);
+  if (!batch) {
+    batch = { count: 0, timer: null };
+    publicBatches.set(io, batch);
+  }
+  batch.count += 1;
+  if (batch.timer) return;
+  batch.timer = setTimeout(() => {
+    const count = batch.count;
+    batch.count = 0;
+    batch.timer = null;
+    emitStateUpdated(io, { reason: 'SOS_CREATED', count });
+  }, SOS_FLOOD_CONFIG.PUBLIC_EVENT_THROTTLE_MS);
+  batch.timer.unref?.();
+}
+
 export function emitSosCreated(io, sos) {
   io?.to(DISPATCHER_ROOM).emit('sos:created', sos);
-  emitStateUpdated(io, { reason: 'SOS_CREATED', sosId: sos.id });
+  emitBatchedSosCreated(io);
 }
 
 export function emitSosUpdated(io, sos, reason) {

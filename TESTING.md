@@ -6,10 +6,11 @@ All tests are automated spec files and run in CI (`.github/workflows/ci.yml`) on
 
 | Suite | Command | Tests | What it proves |
 |---|---|---|---|
-| Backend unit | `cd backend && npm test` | 62 | Pure rules: routing, rerouting, thresholds, circuit breaker, fallback chain, rate limits, CORS, error contract |
-| Backend integration | `cd backend && npm run test:integration` | 36 | Real PostgreSQL + Prisma transactions, real HTTP to the routing provider, real Socket.IO server |
-| Frontend | `cd frontend && npm test` | 19 | i18n parity (AZ = EN keys and placeholders), Red Alert banner, offline banner, route card, API error translation |
-| Coverage | `cd backend && npm run test:coverage` | 98 | **91.6 % lines · 94.3 % functions · 79.6 % branches** (CI fails below 80 / 80 / 70) |
+| Backend unit | `cd backend && npm test` | 72 | Pure rules: routing, rerouting, thresholds, circuit breaker, fallback chain, rate limits, CORS, error contract |
+| Backend integration | `cd backend && npm run test:integration` | 55 | Real PostgreSQL + Prisma transactions, real HTTP to the routing provider, real Socket.IO server |
+| Frontend | `cd frontend && npm test` | 24 | i18n parity (AZ = EN keys and placeholders), Red Alert banner, offline banner, route card, API error translation |
+| Coverage | `cd backend && npm run test:coverage` | 127 | **92.3 % lines · 94.6 % functions · 81.2 % branches** (CI fails below 80 / 80 / 70) |
+| Load test | `cd backend && npm run loadtest` | 600 × 3 scenarios | Botnet mean **141–252 ms** (< 300 ms), duplicate storm → 1 record, single source → 429 |
 
 ## Requirement → test traceability
 
@@ -26,6 +27,9 @@ All tests are automated spec files and run in CI (`.github/workflows/ci.yml`) on
 | **Drop #1** Priority #1 special-care SOS + step-free route | `unit/crisisAndRouting.test.js`, `unit/crisisRules.test.js` (MEDICAL unit preferred), `component EvacuationRouteCard.test.jsx` |
 | **Drop #1** AZ / EN switching | `frontend i18n/translations.test.js`, `RedAlertBanner.test.jsx`, `lib/api.test.js` |
 | **Drop #2** Routing API 503 / > 5 s → circuit breaker + fallback + "Oflayn" notice | `unit/circuitBreaker.test.js`, `unit/routingGateway.test.js`, `integration/routingResilience.int.test.js`, `RoutingModeBanner.test.jsx` |
+| **Drop #3** 500+ SOS flood: rate limit + duplicate filter, panel not blocked | `integration/sosFlood.int.test.js`, `unit/floodProtection.test.js`, `unit/rateLimits.test.js`, `frontend lib/throttle.test.js` |
+| **Drop #3** Brigade dispatch protected by JWT + RBAC | `integration/rbac.int.test.js`, `SosFeedList.test.jsx`, `RedAlertBanner.test.jsx` |
+| **Drop #3** Mean latency < 300 ms under mass requests | `integration/sosFlood.int.test.js` (server-side mean via `Server-Timing`), `loadtest/sosFlood.js` (end-to-end) |
 
 ## Reliability & security scenarios covered
 
@@ -35,6 +39,12 @@ All tests are automated spec files and run in CI (`.github/workflows/ci.yml`) on
 - **External dependency failure:** HTTP 503, > timeout, provider process gone (connection refused), circuit open (no calls made), stale cache never used after a road closes, automatic recovery.
 - **Abuse:** SOS flood → 429, failed logins → 429, CORS refuses foreign origins, JWT never in a response body.
 - **Input validation:** invalid body / query / path params → 400 with a stable `code`.
+
+## Load test (`backend/loadtest/sosFlood.js`)
+
+No dependencies. Three scenarios with 600 requests at concurrency 500 after a 100-request warm-up: **botnet** (distinct IPs via `X-Forwarded-For` + distinct citizens), **single-source flood**, **duplicate storm**; a dispatcher loads the dashboard throughout and dispatches a brigade afterwards. Exit code 0 only if the botnet mean is < 300 ms. Run it inside the Docker network to exclude Docker Desktop's port proxy (see README §8).
+
+Why two latency numbers: the in-process integration test asserts the **server-side** mean (from `Server-Timing`, ~50–100 ms) because a single test process cannot open 600 raw TCP connections at once (macOS listen backlog = 128); the load test measures **end-to-end** latency against the real container.
 
 ## How the integration tests run
 

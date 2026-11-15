@@ -1,10 +1,14 @@
 import { prisma } from '../../src/config/db.js';
 import { seedDatabase } from '../../src/db/seedData.js';
+import { invalidateZoneCache } from '../../src/services/zoneCache.js';
+import { resetDuplicateIndex } from '../../src/services/sosService.js';
 import { signDispatcherToken } from '../../src/services/authService.js';
 
 /** Restore the deterministic Baku seed before each test. */
 export async function resetDatabase() {
   await seedDatabase(prisma);
+  invalidateZoneCache();
+  resetDuplicateIndex();
 }
 
 /** Bearer header for a seeded dispatcher account. */

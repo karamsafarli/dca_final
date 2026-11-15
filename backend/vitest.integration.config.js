@@ -28,6 +28,8 @@ export default defineConfig({
       DATABASE_URL: TEST_DATABASE_URL,
       // Scenario tests send many SOS from one test client; limits are tested separately
       SOS_RATE_LIMIT_PER_MIN: '10000',
+      // Deterministic assertions on `triggeredAlert`; the budget itself is unit-tested
+      SOS_EVALUATION_BUDGET_MS: '5000',
     },
     fileParallelism: false,
     testTimeout: 20000,

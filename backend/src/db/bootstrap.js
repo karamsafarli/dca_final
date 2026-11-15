@@ -1,4 +1,5 @@
 import { prisma } from '../config/db.js';
+import { invalidateZoneCache } from '../services/zoneCache.js';
 import {
   SEED_ASSEMBLY_POINTS,
   SEED_ROADS,
@@ -45,6 +46,7 @@ export async function ensureDatabaseSeeded() {
   if (count === 0) {
     console.log('Empty database detected. Seeding initial Baku crisis data...');
     await seedDatabase(prisma);
+    invalidateZoneCache();
     console.log('Initial seed completed.');
   } else {
     await syncAccessibilityFlags();

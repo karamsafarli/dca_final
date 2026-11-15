@@ -6,7 +6,7 @@ Fövqəladə hallar (zəlzələ, güclü sel, yanğın, sənaye qəzaları və k
 
 **Sənədlər:** [Texniki izah](TECHNICAL_DOC.md) ([.docx](docs/TECHNICAL_DOC.docx)) · [Testlər](TESTING.md) · [Təhlükəsizlik](SECURITY.md) · [Challenge Drop-lar](docs/CHALLENGE_DROPS.md) · [Demo ssenarisi](DEMO_SCRIPT.md) · [AI bəyannaməsi](AI_DECLARATION.md)
 
-> **English summary.** A real-time micro-system for urban evacuations. **Citizens** get the nearest safe assembly point with live occupancy and a route that automatically avoids closed roads and points ≥ 90 % full, send a one-click SOS and confirm "I am safe". **Dispatchers** see SOS signals, occupancy and rescue brigades live; the **critical crisis algorithm** raises a Red Alert when ≥ 4 *distinct* citizens send SOS within 500 m / the same zone in 5 minutes, or a point exceeds 95 %, and executes the response (brigade + reserve point) in one click, race-safe. **Challenge Drop #1:** Priority #1 SOS and step-free routes for mobility-impaired citizens, full AZ/EN UI. **Challenge Drop #2:** when the external routing API returns 503 or takes > 5 s, a circuit breaker switches to cached routes / the local road graph and shows an "offline / backup route mode" notice. Stack: React + Leaflet, Node.js + Express + Socket.IO, Prisma + PostgreSQL, Docker Compose. 117 automated tests, 91.6 % backend coverage, CI on every push.
+> **English summary.** A real-time micro-system for urban evacuations. **Citizens** get the nearest safe assembly point with live occupancy and a route that automatically avoids closed roads and points ≥ 90 % full, send a one-click SOS and confirm "I am safe". **Dispatchers** see SOS signals, occupancy and rescue brigades live; the **critical crisis algorithm** raises a Red Alert when ≥ 4 *distinct* citizens send SOS within 500 m / the same zone in 5 minutes, or a point exceeds 95 %, and executes the response (brigade + reserve point) in one click, race-safe. **Challenge Drop #1:** Priority #1 SOS and step-free routes for mobility-impaired citizens, full AZ/EN UI. **Challenge Drop #2:** when the external routing API returns 503 or takes > 5 s, a circuit breaker switches to cached routes / the local road graph and shows an "offline / backup route mode" notice. Stack: React + Leaflet, Node.js + Express + Socket.IO, Prisma + PostgreSQL, Docker Compose. **Challenge Drop #3:** SOS flood protection (edge + app rate limits, duplicate merging, coalesced crisis evaluation), RBAC for critical dispatcher actions, measured mean latency 141–252 ms for 600 simultaneous SOS. 151 automated tests, 92 % backend coverage, CI on every push.
 
 ### Tələb → İmplementasiya → Test
 
@@ -23,6 +23,9 @@ Fövqəladə hallar (zəlzələ, güclü sel, yanğın, sənaye qəzaları və k
 | **Drop #1:** Prioritet #1 SOS + maneəsiz marşrut | `SPECIAL_CARE`, `accessibleOnly`, MEDICAL briqada üstünlüyü | `unit/crisisAndRouting`, `EvacuationRouteCard.test` |
 | **Drop #1:** AZ / EN dinamik i18n | `I18nContext`, xəta kodlarının tərcüməsi | `translations.test`, `api.test`, `RedAlertBanner.test` |
 | **Drop #2:** API 503 / > 5 s → Circuit Breaker + Fallback + "Oflayn" bildirişi | `circuitBreaker.js`, `routingGateway.js`, `RoutingModeBanner.jsx` | `unit/circuitBreaker`, `unit/routingGateway`, `integration/routingResilience` |
+| **Drop #3:** 500+ SOS flood → rate limit + dublikat filtri | nginx `limit_req`, `rateLimits.js`, `sosService.js` (single-flight + dublikat indeksi) | `integration/sosFlood`, `unit/floodProtection`, `unit/rateLimits` |
+| **Drop #3:** Briqada yönləndirmə JWT + RBAC ilə | `config/permissions.js`, `requirePermission` | `integration/rbac`, `SosFeedList.test`, `RedAlertBanner.test` |
+| **Drop #3:** Kütləvi sorğuda orta gecikmə < 300 ms | Coalesced qiymətləndirmə, latency budget, `latencyMetrics.js`, `loadtest/sosFlood.js` | `integration/sosFlood` (server mean < 300 ms) |
 
 ---
 
@@ -197,8 +200,9 @@ Dispetçer panelinə (`/dispatcher`), yol bağlama əməliyyatlarına və simuly
 ### İlkin Dispetçer Hesabları (Seeded)
 | İstifadəçi adı | Şifrə (Default) | Rol | Nişan Kodu |
 |---|---|---|---|
+| `observer` | `Obs001!Crisis` | `OBSERVER` (yalnız baxış) | `OBS-001` |
 | `dispatcher1` | `Fhn112!Crisis` | `DISPATCHER` | `FHN-112` |
-| `commander` | `Cmd001!Crisis` | `COMMANDER` | `CMD-001` |
+| `commander` | `Cmd001!Crisis` | `COMMANDER` (+ sistem sıfırlama) | `CMD-001` |
 
 *(İstehsal mühitində `SEED_DISPATCHER_PASSWORD`, `SEED_COMMANDER_PASSWORD` və `JWT_SECRET` mühit dəyişənləri ilə dəyişdirilə bilər.)*
 
@@ -249,7 +253,41 @@ docker compose start routing-api   # ~20 s ərzində avtomatik ONLINE
 
 ---
 
-## 8. Əsas API Endpoint-ləri
+## 8. Challenge Drop #3: SOS Flood / Spam Hücumu + RBAC + < 300 ms Gecikmə
+
+**Tələb:** eyni anda 500-dən çox saxta SOS sorğusu zamanı SOS endpoint-ləri rate limiting və dublikat filtrasiyası ilə qorunmalı, dispetçer paneli bloklanmamalı, kritik əməliyyatlar (briqada yönləndirmə) JWT + RBAC ilə qorunmalı, orta cavab müddəti 300 ms-dən aşağı qalmalıdır.
+
+**Müdafiə qatları:**
+
+| Qat | Mexanizm |
+|---|---|
+| 1. Kənar (nginx) | `limit_req` — IP başına 2 SOS/s, burst 10 → `429` (Node-a çatmadan). `X-Forwarded-For` nginx tərəfindən **üzərinə yazılır** — saxtalaşdırıla bilməz; backend portu yalnız `127.0.0.1`-də. |
+| 2. Tətbiq rate limit | `express-rate-limit`: IP başına dəqiqədə 10 SOS → `429 RATE_LIMITED`. |
+| 3. Dublikat filtri | Eyni vətəndaş + eyni təhlükə 2 dəqiqə ərzində = **eyni hadisə**: eyni anda gələn sorğular *single-flight* ilə birləşir, sonrakılar mövcud SOS-u qaytarır (`200 duplicate:true`). 500 sorğuluq "panik" → **1 qeyd**. |
+| 4. Böhran alqoritmi | Zona üzrə **coalesced** qiymətləndirmə (1 işləyən + 1 növbədə): 500 SOS → ~2 qiymətləndirmə, lock/pool tıxanması yoxdur. Analitika xətası saxlanmış SOS-u heç vaxt itirmir. |
+| 5. Gecikmə büdcəsi | Cavab qiymətləndirməni ən çox 30 ms gözləyir; sonra SOS təsdiqlənir, Qırmızı Həyəcan dispetçerə Socket.IO ilə çatır. |
+| 6. Dispetçer paneli | Yenilənmə saniyədə 1 dəfə ilə məhdudlaşır (throttle), bildirişlər toplanır ("37 yeni SOS"); ictimai hadisələr 500 ms-lik paketlərlə göndərilir. |
+| 7. RBAC | `OBSERVER` (yalnız baxış) · `DISPATCHER` (briqada, həyəcan, yol, doluluq) · `COMMANDER` (+ sistem sıfırlama). Rol hər sorğuda **bazadan** oxunur (token-ə güvənilmir); JWT `iss`/`aud` yoxlanılır; icazəsiz → `403 FORBIDDEN`. UI icazəsi olmayan düymələri göstərmir. |
+| 8. Müşahidə | Hər cavabda `Server-Timing`; `GET /api/metrics/latency` (route üzrə mean / p95 / p99); konsolda canlı "SOS API gecikməsi" göstəricisi. |
+
+**Ölçülmüş nəticələr** (`npm run loadtest`, 600 eyni anda SOS, 500 paralel, Docker şəbəkəsi daxilində, isinmədən sonra):
+
+| Ssenari | Əvvəl | Sonra |
+|---|---|---|
+| Botnet (600 fərqli IP + vətəndaş) — orta gecikmə | 1526 ms | **141–252 ms** (server tərəfi ~40–56 ms) |
+| Dublikat fırtınası (1 vətəndaş × 600) | 355 dublikat qeyd + **245 HTTP 500** | **1 qeyd**, 0 xəta, ~40–63 ms |
+| Tək mənbə (1 IP × 600) | — | 590–600 × `429`, ~33–45 ms |
+| Daşqın zamanı dispetçer paneli / briqada göndərmə | p95 2.2 s | ~25–45 ms / **4–6 ms** |
+
+```bash
+cd backend && npm run loadtest                          # host-dan (127.0.0.1:4050)
+docker run --rm --network dca_final_default -v "$PWD/backend/loadtest:/lt:ro" node:24-bookworm-slim \
+  node /lt/sosFlood.js --url http://backend:4000          # Docker şəbəkəsi daxilindən
+```
+
+---
+
+## 9. Əsas API Endpoint-ləri
 
 | Metod | Endpoint | İcazə | Təyinat |
 |---|---|---|---|
@@ -258,13 +296,14 @@ docker compose start routing-api   # ~20 s ərzində avtomatik ONLINE
 | `GET` | `/api/auth/me` | Dispetçer JWT | Cari operator profili |
 | `GET` | `/api/zones` | Açıq | Şəhər rayonlarının siyahısı |
 | `GET` | `/api/citizen/evacuation-plan` | Açıq | Ən yaxın məntəqələr, doluluq %, aktiv/alternativ və maneəsiz (`accessibleOnly`) marşrut |
-| `POST` | `/api/citizen/sos` | Açıq | 1 kliklə SOS göndərmək (`citizenCategory`: `STANDARD` \| `SPECIAL_CARE`) |
+| `POST` | `/api/citizen/sos` | Açıq (rate limit + dublikat filtri) | 1 kliklə SOS: `201` yeni, `200 duplicate:true` mövcud hadisə |
 | `PATCH` | `/api/citizen/safe` | Açıq | `"Təhlükəsizəm"` statusunu yeniləmək |
+| `GET` | `/api/metrics/latency` | Dispetçer JWT (`dashboard:read`) | Route üzrə canlı gecikmə (mean/p95/p99), hədəf < 300 ms |
 | `GET` | `/api/routing/status` | Açıq | Xarici marşrut API-si və Circuit Breaker vəziyyəti |
 | `GET` | `/api/traffic/roads` | Açıq | Yol-nəqliyyat şəbəkəsinin cari vəziyyəti |
 | `PATCH` | `/api/traffic/roads/:id/status` | **Dispetçer JWT** | Yolun statusunu dəyişmək (`OPEN`, `CONGESTED`, `CLOSED`) |
 | `GET` | `/api/dispatcher/dashboard` | **Dispetçer JWT** | Dispetçer panelinin tam canlı məlumatı (Priority #1 sıralamalı SOS axını) |
 | `PATCH` | `/api/dispatcher/shelters/:id/occupancy` | **Dispetçer JWT** | Toplanış məntəqəsinin doluluğunu/statusunu yeniləmək |
-| `POST` | `/api/dispatcher/sos/:id/dispatch` | **Dispetçer JWT** | SOS siqnalına xilasetmə briqadası yönləndirmək |
-| `POST` | `/api/dispatcher/alerts/:id/execute` | **Dispetçer JWT** | Qırmızı Həyəcan qərarını 1 kliklə icra etmək |
+| `POST` | `/api/dispatcher/sos/:id/dispatch` | **JWT + `brigades:dispatch`** | SOS siqnalına xilasetmə briqadası yönləndirmək |
+| `POST` | `/api/dispatcher/alerts/:id/execute` | **JWT + `alerts:execute`** | Qırmızı Həyəcan qərarını 1 kliklə icra etmək |
 | `POST` | `/api/simulation/*` | **Dispetçer JWT** | Demo ssenariləri (`sos-burst`, `road-toggle`, `occupancy-spike`, `routing-api`, `reset`) |

@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { ALLOWED_ORIGINS, AUTH_COOKIE_NAME } from '../config/constants.js';
+import { can } from '../config/permissions.js';
 import { parseCookieValue, verifyDispatcherToken } from '../services/authService.js';
 import { verifySosAccessToken } from '../services/sosService.js';
 import { DISPATCHER_ROOM, citizenSosRoom } from './events.js';
@@ -22,7 +23,7 @@ export function attachRealtime(httpServer) {
     const cookieToken = parseCookieValue(socket.handshake.headers?.cookie, AUTH_COOKIE_NAME);
     const dispatcherPayload = verifyDispatcherToken(socket.handshake.auth?.token || cookieToken);
 
-    if (dispatcherPayload?.sub) {
+    if (dispatcherPayload?.sub && can(dispatcherPayload.role, 'dashboard:read')) {
       socket.data.dispatcher = dispatcherPayload;
       socket.join(DISPATCHER_ROOM);
     }

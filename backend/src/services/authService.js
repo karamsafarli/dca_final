@@ -1,8 +1,12 @@
 import crypto from 'node:crypto';
+
+const JWT_ISSUER = 'urban-crisis-engine';
+const JWT_AUDIENCE = 'dispatch-console';
 import jwt from 'jsonwebtoken';
 import { AUTH_COOKIE_NAME, JWT_EXPIRES_IN, JWT_SECRET } from '../config/constants.js';
 import { prisma } from '../config/db.js';
 import { AppError } from '../utils/errors.js';
+import { permissionsFor } from '../config/permissions.js';
 
 const SCRYPT_KEYLEN = 64;
 
@@ -45,6 +49,8 @@ export function signDispatcherToken(dispatcher) {
     {
       algorithm: 'HS256',
       expiresIn: JWT_EXPIRES_IN,
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     }
   );
 }
@@ -55,7 +61,11 @@ export function signDispatcherToken(dispatcher) {
 export function verifyDispatcherToken(token) {
   if (!token) return null;
   try {
-    return jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+    return jwt.verify(token, JWT_SECRET, {
+      algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
   } catch {
     return null;
   }
@@ -89,6 +99,7 @@ export function sanitizeDispatcher(dispatcher) {
     fullName: dispatcher.fullName,
     badgeCode: dispatcher.badgeCode,
     role: dispatcher.role,
+    permissions: permissionsFor(dispatcher.role),
     isActive: dispatcher.isActive,
     lastLoginAt: dispatcher.lastLoginAt,
   };

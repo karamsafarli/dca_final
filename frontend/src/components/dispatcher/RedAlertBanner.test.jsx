@@ -56,3 +56,12 @@ describe('RedAlertBanner', () => {
     expect(onDismiss).toHaveBeenCalledWith(8);
   });
 });
+
+describe('RedAlertBanner — RBAC (Challenge Drop #3)', () => {
+  it('shows no execute / dismiss controls to a role without those permissions', () => {
+    renderWithI18n(<RedAlertBanner alerts={[clusterAlert]} />, { lang: 'en' });
+    expect(screen.getByText(/SOS signals from 5 different citizens/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Approve & Execute/ })).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Dismiss')).not.toBeInTheDocument();
+  });
+});

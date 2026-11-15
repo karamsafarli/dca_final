@@ -50,9 +50,12 @@ describe('Demo scenarios', () => {
     expect(res.body.triggeredAlert).toBeNull();
   });
 
-  it('reset: restores the clean seed state', async () => {
+  it('reset: restores the clean seed state (COMMANDER only)', async () => {
     await sim('sos-burst', { zoneId: zone.id });
-    const res = await sim('reset');
+    const res = await request(app)
+      .post('/api/simulation/reset')
+      .set('Authorization', await dispatcherAuthHeader('commander'))
+      .send({});
     expect(res.status).toBe(200);
     expect(await prisma.criticalAlert.count()).toBe(0);
     expect(await prisma.sosSignal.count()).toBe(2); // the two seeded demo SOS

@@ -9,7 +9,7 @@ const STORAGE_KEY = 'urban_crisis_demo_bar';
  * Demo / jury tool, not part of an operator's daily screen: collapsed by
  * default (remembered per browser) and visually quiet.
  */
-export function SimulationBar({ zones = [], assemblyPoints = [], routing, onRunAction, isBusy }) {
+export function SimulationBar({ zones = [], assemblyPoints = [], routing, onRunAction, canReset = false, isBusy }) {
   const { t } = useI18n();
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [isOpen, setIsOpen] = useState(() => {
@@ -112,10 +112,12 @@ export function SimulationBar({ zones = [], assemblyPoints = [], routing, onRunA
             <Button size="sm" disabled={isBusy} onClick={() => onRunAction('routing-api', { mode: 'HEALTHY' })}>
               {t('simRoutingHealthy')}
             </Button>
-            <Button variant="ghost" size="sm" disabled={isBusy} onClick={() => onRunAction('reset')}>
-              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-              {t('simReset')}
-            </Button>
+            {canReset && (
+              <Button variant="ghost" size="sm" disabled={isBusy} onClick={() => onRunAction('reset')}>
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('simReset')}
+              </Button>
+            )}
           </div>
         </div>
       )}

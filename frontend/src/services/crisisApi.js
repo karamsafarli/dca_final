@@ -25,6 +25,8 @@ export const crisisApi = {
 
   getDispatcherDashboard: () => api.get('/dispatcher/dashboard'),
 
+  getLatencyMetrics: () => api.get('/metrics/latency'),
+
   updateRoadStatus: (roadId, payload) =>
     api.patch(`/traffic/roads/${roadId}/status`, payload),
 

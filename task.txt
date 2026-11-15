@@ -58,3 +58,9 @@ Challenge Drop #2 (Əlavə Alt-tapşırıq):
 Vetendas modulunun istifade etdiyi Xarici Xerite ve Marsrutlasdirma API-si siradan cixmisdir (http 503 service unavailable xetasi qaytarir ve ya cavab muddeti 5 saniyeni kecir)
 
 Sistem bu xeta zamani cokmemeli (unhandled exception vermemeli), Circuit Breaker / Fallback mexanizmi avtomatik ise dusmeli ve mesafe/marsrut hesablamalarini local ehtiyat melumat bazasindan (statik koordinat matrisi ve ya son keslenmis marsrutlar) icra ederek istifadeciye "Oflayn / Ehtiyat marsrut rejiminde isleyir" bildirisi ile xidmet gostermeye davam etmelidir.
+
+---
+Challenge Drop #3 (Əlavə Alt-tapşırıq):
+Bohran zamani panika ve ya bot hucumu neticesinde sisteme eyni anda 500-den cox saxta sox sorgusu (sos flood / spam attack) gonderilmesi ssenarisi aktivlesmisdir.
+
+Komanda SOS endpointlerini rate limiting ve dublikat filtrasiyasi ile qorumali (saxta sorgularin dispetcer panelini bloklamamasinin qarsisini almali), dispetcer panelinin kritik emeliyyatlarini (xilasetme briqadasinin yonlendirilmesi) JWT / role-based access control ile tehlukesizlesdirilmeli ve kutlevi sorgular zamani sistemin orta cavab muddetinin (latency) 300ms-den asagi qalmasini temin etmelidir.

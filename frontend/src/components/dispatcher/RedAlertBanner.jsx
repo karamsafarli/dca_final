@@ -48,21 +48,25 @@ export function RedAlertBanner({ alerts = [], onExecute, onDismiss, isBusy }) {
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Button variant="danger" size="lg" disabled={isBusy} onClick={() => onExecute?.(alert.id)}>
+              {onExecute && (
+              <Button variant="danger" size="lg" disabled={isBusy} onClick={() => onExecute(alert.id)}>
                 <Check className="h-5 w-5" aria-hidden="true" />
                 {t('redAlertExecuteBtn')}
               </Button>
+              )}
+              {onDismiss && (
               <Button
                 variant="ghost"
                 size="lg"
                 disabled={isBusy}
-                onClick={() => onDismiss?.(alert.id)}
+                onClick={() => onDismiss(alert.id)}
                 title={t('closeBtn')}
                 aria-label={t('closeBtn')}
                 className="w-12 px-0"
               >
                 <X className="h-5 w-5" aria-hidden="true" />
               </Button>
+              )}
             </div>
           </div>
         </section>

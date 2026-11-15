@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireDispatcherAuth } from '../middleware/authMiddleware.js';
+import { requireDispatcherAuth, requirePermission } from '../middleware/authMiddleware.js';
 import {
   dismissCriticalAlert,
   executeCriticalAlert,
@@ -32,6 +32,7 @@ const dispatchSosSchema = z.object({
 
 router.get(
   '/dispatcher/dashboard',
+  requirePermission('dashboard:read'),
   asyncHandler(async (_req, res) => {
     const dashboard = await getDispatcherDashboard();
     res.json(dashboard);
@@ -40,6 +41,7 @@ router.get(
 
 router.patch(
   '/dispatcher/shelters/:id/occupancy',
+  requirePermission('shelters:update'),
   validateParams(idParamSchema),
   validateBody(occupancySchema),
   asyncHandler(async (req, res) => {
@@ -55,6 +57,7 @@ router.patch(
 
 router.post(
   '/dispatcher/sos/:id/dispatch',
+  requirePermission('brigades:dispatch'),
   validateParams(idParamSchema),
   validateBody(dispatchSosSchema),
   asyncHandler(async (req, res) => {
@@ -70,6 +73,7 @@ router.post(
 
 router.post(
   '/dispatcher/alerts/:id/execute',
+  requirePermission('alerts:execute'),
   validateParams(idParamSchema),
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');
@@ -80,6 +84,7 @@ router.post(
 
 router.patch(
   '/dispatcher/alerts/:id/dismiss',
+  requirePermission('alerts:dismiss'),
   validateParams(idParamSchema),
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');

@@ -3,8 +3,11 @@ import { prisma } from '../config/db.js';
 import { emitSosCreated, emitSosUpdated, emitStateUpdated } from '../realtime/events.js';
 import { badRequest, forbidden, notFound, conflict } from '../utils/errors.js';
 import { claimBrigade } from './brigadeAllocation.js';
-import { evaluateSosCrisis } from './crisisEngineService.js';
+import { SOS_FLOOD_CONFIG } from '../config/constants.js';
+import { singleFlight } from '../resilience/coalesce.js';
+import { scheduleSosEvaluation } from './crisisEngineService.js';
 import { findNearestZone } from './geometryService.js';
+import { getZonesCached } from './zoneCache.js';
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
@@ -31,12 +34,82 @@ export async function verifySosAccessToken(sosId, accessToken) {
   return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 
+const collapseIdenticalRequests = singleFlight();
+
 /**
- * Create a new citizen SOS signal and evaluate Critical Crisis rules.
- * Returns the one-time `accessToken` the citizen needs to update or follow this SOS.
+ * In-memory index of recent SOS per duplicate key (key -> { sosId, at }).
+ * New citizens skip the duplicate DB lookup entirely; the DB is consulted only
+ * for keys seen before, or right after a restart (index still warming up).
+ */
+const recentSosByKey = new Map();
+let processStartedAt = Date.now();
+const windowMs = () => SOS_FLOOD_CONFIG.DUPLICATE_WINDOW_SECONDS * 1000;
+
+function rememberSos(key, sosId) {
+  recentSosByKey.set(key, { sosId, at: Date.now() });
+  if (recentSosByKey.size > 50000) {
+    const cutoff = Date.now() - windowMs();
+    for (const [k, v] of recentSosByKey) if (v.at < cutoff) recentSosByKey.delete(k);
+  }
+}
+
+export function resetDuplicateIndex({ warm = false } = {}) {
+  recentSosByKey.clear();
+  // Tests can simulate a long-running process whose index is already warm
+  processStartedAt = warm ? 0 : Date.now();
+}
+
+/** Same citizen + same hazard = same emergency (duplicate filter key). */
+export const duplicateKey = (citizenCode, hazardType) =>
+  citizenCode ? `${citizenCode.trim()}|${hazardType}` : null;
+
+/**
+ * Create a citizen SOS (Challenge Drop #3: flood-safe).
+ * - Concurrent identical requests (same citizen + hazard) collapse into one.
+ * - A repeat within SOS_DUPLICATE_WINDOW_SECONDS returns the existing active SOS
+ *   (`duplicate: true`, HTTP 200) instead of creating another record, so spam
+ *   cannot bury real signals in the dispatcher queue.
+ * Returns the one-time `accessToken` only to the request that created the SOS.
  */
 export async function createSosSignal(payload, io) {
-  const zones = await prisma.zone.findMany();
+  const key = duplicateKey(payload.citizenCode, payload.hazardType);
+  if (!key) return createNewSos(payload, io);
+
+  const { shared, value } = await collapseIdenticalRequests(key, () => createOrReuseSos(payload, io));
+  if (!shared) return value;
+  return { sos: value.sos, duplicate: true, triggeredAlert: null };
+}
+
+async function createOrReuseSos(payload, io) {
+  const key = duplicateKey(payload.citizenCode, payload.hazardType);
+  const known = recentSosByKey.get(key);
+  const indexWarm = Date.now() - processStartedAt > windowMs();
+  if (indexWarm && (!known || Date.now() - known.at > windowMs())) {
+    const created = await createNewSos(payload, io);
+    rememberSos(key, created.sos.id);
+    return created;
+  }
+
+  const since = new Date(Date.now() - windowMs());
+  const existing = await prisma.sosSignal.findFirst({
+    where: {
+      citizenCode: payload.citizenCode.trim(),
+      hazardType: payload.hazardType,
+      citizenStatus: 'SOS',
+      status: { not: 'RESOLVED' },
+      createdAt: { gte: since },
+    },
+    orderBy: { createdAt: 'desc' },
+    include: { zone: true, assignedBrigade: true },
+  });
+  if (existing) return { sos: existing, duplicate: true, triggeredAlert: null };
+  const created = await createNewSos(payload, io);
+  rememberSos(key, created.sos.id);
+  return created;
+}
+
+async function createNewSos(payload, io) {
+  const zones = await getZonesCached();
   let zoneId = payload.zoneId ? Number(payload.zoneId) : null;
 
   let lat = payload.lat !== undefined ? Number(payload.lat) : null;
@@ -84,19 +157,27 @@ export async function createSosSignal(payload, io) {
       status: 'PENDING',
       accessTokenHash: sha256(accessToken),
     },
-    include: {
-      zone: true,
-      assignedBrigade: true,
-    },
   });
+  // Relations from cache instead of 2 extra SELECTs per SOS (flood hot path)
+  sos.zone = zones.find((z) => z.id === zoneId) ?? null;
+  sos.assignedBrigade = null;
 
   emitSosCreated(io, sos);
 
-  const triggeredAlert = await evaluateSosCrisis(sos, io);
+  // Wait for the crisis evaluation only within the latency budget; it always
+  // completes (and pushes any Red Alert to dispatchers) in the background.
+  const evaluation = scheduleSosEvaluation(sos, io);
+  const triggeredAlert = await Promise.race([
+    evaluation,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(null), SOS_FLOOD_CONFIG.EVALUATION_BUDGET_MS).unref?.();
+    }),
+  ]);
 
   return {
     sos,
     accessToken,
+    duplicate: false,
     triggeredAlert,
   };
 }

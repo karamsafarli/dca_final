@@ -46,3 +46,18 @@ export const ROUTING_CONFIG = {
   OPEN_DURATION_MS: Number(process.env.ROUTING_CB_OPEN_MS || 20000),
   HEALTH_PROBE_MS: Number(process.env.ROUTING_HEALTH_PROBE_MS || 5000),
 };
+
+/**
+ * SOS flood protection (Challenge Drop #3).
+ * DUPLICATE_WINDOW_SECONDS: same citizen + same hazard within this window is the
+ * same emergency → merged into the existing SOS instead of a new record.
+ */
+export const SOS_FLOOD_CONFIG = {
+  DUPLICATE_WINDOW_SECONDS: Number(process.env.SOS_DUPLICATE_WINDOW_SECONDS || 120),
+  ZONE_CACHE_TTL_MS: Number(process.env.ZONE_CACHE_TTL_MS || 30000),
+  PUBLIC_EVENT_THROTTLE_MS: Number(process.env.PUBLIC_EVENT_THROTTLE_MS || 500),
+  // How long an SOS response may wait for the crisis evaluation. Past this the
+  // SOS is acknowledged and the Red Alert is delivered to dispatchers over
+  // Socket.IO when the (coalesced) evaluation finishes. Keeps latency bounded.
+  EVALUATION_BUDGET_MS: Number(process.env.SOS_EVALUATION_BUDGET_MS || 30),
+};

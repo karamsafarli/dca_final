@@ -16,6 +16,13 @@ export const SEED_DISPATCHERS = [
     role: 'COMMANDER',
     password: process.env.SEED_COMMANDER_PASSWORD || 'Cmd001!Crisis',
   },
+  {
+    username: 'observer',
+    fullName: 'Şəhər İcra Hakimiyyəti — Müşahidəçi',
+    badgeCode: 'OBS-001',
+    role: 'OBSERVER',
+    password: process.env.SEED_OBSERVER_PASSWORD || 'Obs001!Crisis',
+  },
 ];
 
 export async function ensureDispatchersSeeded(prisma) {

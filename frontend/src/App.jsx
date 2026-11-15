@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import { DispatcherLoginCard } from './components/auth/DispatcherLoginCard';
@@ -24,15 +24,6 @@ export function App() {
   const [activeAlertsCount, setActiveAlertsCount] = useState(0);
   const [dispatcher, setDispatcher] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-
-  const syncAlertBadge = useCallback(async () => {
-    try {
-      const data = await crisisApi.getDispatcherDashboard();
-      setActiveAlertsCount(data.summary?.activeAlertsCount || 0);
-    } catch {
-      // Ignore if session expired; auth interceptor handles redirect
-    }
-  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -72,21 +63,12 @@ export function App() {
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
 
-    if (dispatcher) {
-      syncAlertBadge();
-      socket.on('state:updated', syncAlertBadge);
-      socket.on('alert:created', syncAlertBadge);
-      socket.on('alert:executed', syncAlertBadge);
-    }
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
-      socket.off('state:updated', syncAlertBadge);
-      socket.off('alert:created', syncAlertBadge);
-      socket.off('alert:executed', syncAlertBadge);
     };
-  }, [dispatcher, syncAlertBadge]);
+  }, []);
 
   const handleLoginSuccess = (authenticatedDispatcher) => {
     setDispatcher(authenticatedDispatcher);
@@ -138,7 +120,7 @@ export function App() {
                     onLogout={handleLogout}
                   />
                   <main>
-                    <DispatcherPage onAlertsCountChange={setActiveAlertsCount} />
+                    <DispatcherPage onAlertsCountChange={setActiveAlertsCount} dispatcher={dispatcher} />
                   </main>
                 </>
               ) : (

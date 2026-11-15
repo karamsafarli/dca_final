@@ -268,7 +268,12 @@ export function CitizenPage() {
         lng: origin?.lng,
         notes,
       });
-      const ownSos = { ...result.sos, accessToken: result.accessToken };
+      if (result.duplicate) {
+        // Already recorded (Challenge Drop #3 duplicate filter): keep our token
+        toast.info(t('toastSosDuplicate'), { toastId: 'sos-duplicate' });
+        if (activeSos?.id === result.sos.id) return;
+      }
+      const ownSos = { ...result.sos, accessToken: result.accessToken ?? activeSos?.accessToken };
       setActiveSos(ownSos);
       setLastSafeConfirmedAt(null);
       localStorage.setItem(ACTIVE_SOS_KEY, JSON.stringify(ownSos));

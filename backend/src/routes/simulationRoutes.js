@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireDispatcherAuth } from '../middleware/authMiddleware.js';
+import { requireDispatcherAuth, requirePermission } from '../middleware/authMiddleware.js';
 import {
   resetSystemSimulation,
   simulateOccupancySpike,
@@ -11,7 +11,7 @@ import {
 import { asyncHandler, validateBody } from '../utils/http.js';
 
 const router = Router();
-router.use('/simulation', requireDispatcherAuth);
+router.use('/simulation', requireDispatcherAuth, requirePermission('simulation:run'));
 
 const sosBurstSchema = z.object({
   zoneId: z.coerce.number().int().positive().optional(),
@@ -78,6 +78,7 @@ router.post(
 
 router.post(
   '/simulation/reset',
+  requirePermission('system:reset'),
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');
     const result = await resetSystemSimulation(io);

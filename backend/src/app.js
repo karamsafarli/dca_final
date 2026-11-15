@@ -10,6 +10,8 @@ import citizenRoutes from './routes/citizenRoutes.js';
 import dispatcherRoutes from './routes/dispatcherRoutes.js';
 import simulationRoutes from './routes/simulationRoutes.js';
 import { getRoutingGateway } from './services/routingGateway.js';
+import { latencyMetrics, latencySnapshot } from './middleware/latencyMetrics.js';
+import { requireDispatcherAuth, requirePermission } from './middleware/authMiddleware.js';
 
 export function createApp() {
   const app = express();
@@ -17,6 +19,7 @@ export function createApp() {
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
 
+  app.use(latencyMetrics());
   app.use(helmet({ crossOriginResourcePolicy: false }));
   app.use(
     cors({
@@ -26,8 +29,12 @@ export function createApp() {
   );
   app.use(cookieParser());
   app.use(express.json({ limit: '1mb' }));
-  if (process.env.NODE_ENV !== 'test') {
+  if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
+  } else if (process.env.NODE_ENV !== 'test') {
+    // Production: log problems only. Logging every request synchronously to
+    // stdout costs real latency during an SOS flood; 429s are counted in metrics.
+    app.use(morgan('combined', { skip: (_req, res) => res.statusCode < 400 || res.statusCode === 429 }));
   }
 
   app.get('/api/health', async (_req, res, next) => {
@@ -43,6 +50,11 @@ export function createApp() {
     } catch (err) {
       next(err);
     }
+  });
+
+  // Live latency per route (Challenge Drop #3), for the dispatcher console
+  app.get('/api/metrics/latency', requireDispatcherAuth, requirePermission('dashboard:read'), (_req, res) => {
+    res.json(latencySnapshot());
   });
 
   app.get('/api/routing/status', (_req, res) => {

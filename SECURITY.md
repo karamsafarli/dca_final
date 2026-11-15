@@ -6,7 +6,8 @@ Sistem fövqəladə hal zamanı işləyir: əsas risklər **saxta həyəcan**, *
 |---|---|---|---|---|
 | T1 | Başqasının SOS-unu "Təhlükəsizəm" ilə bağlamaq (IDOR, ardıcıl ID) | Xilasetmə dayandırılır | Hər SOS üçün 192-bit birdəfəlik token; bazada yalnız SHA-256; yoxlama `timingSafeEqual` ilə | `citizenSafety.int` (400 / 403) |
 | T2 | Ad/telefon/koordinatın bütün brauzerlərə yayımı | Şəxsi məlumat sızması | PII yalnız `dispatchers` otağına; vətəndaş yalnız öz SOS statusunu (PII-siz) | `realtime.int` |
-| T3 | Saxta Qırmızı Həyəcan (bir cihazdan çoxlu SOS) | Resursların yanlış yönləndirilməsi | 4 **fərqli** vətəndaş qaydası + dəqiqədə 10 SOS limiti | `crisisEngine.int`, `rateLimits` |
+| T3 | SOS flood / bot hücumu (500+ saxta sorğu), saxta Qırmızı Həyəcan | Panel bloklanır, resurslar yanlış yönləndirilir | nginx `limit_req` (spoof edilə bilməyən IP) + app rate limit, dublikat birləşdirmə, 4 **fərqli** vətəndaş qaydası, coalesced qiymətləndirmə, panel throttle | `sosFlood.int`, `crisisEngine.int`, `rateLimits` |
+| T11 | Kritik əməliyyatın (briqada yönləndirmə) səlahiyyətsiz icrası | Saxta yönləndirmə | JWT (`iss`/`aud`) + RBAC icazə matrisi, rol hər sorğuda bazadan, `403` + audit log | `rbac.int` |
 | T4 | Dispetçer parolunun brute-force-u | Operator panelinin ələ keçirilməsi | 15 dəq / 10 uğursuz cəhd limiti, `scrypt` + salt, real IP (`trust proxy`) | `rateLimits`, `auth.int` |
 | T5 | XSS ilə token oğurluğu | Sessiyanın ələ keçirilməsi | JWT yalnız `HttpOnly` + `SameSite=Lax` cookie-də, cavab gövdəsində yox | `auth.int` |
 | T6 | Başqa saytdan dispetçer adından sorğu (CORS) | İcazəsiz əməliyyat | Açıq origin allow-list, `*` qadağandır | `cors` |
@@ -20,7 +21,8 @@ Sistem fövqəladə hal zamanı işləyir: əsas risklər **saxta həyəcan**, *
 - Seed dispetçer parolları yalnız demo üçündür (`SEED_DISPATCHER_PASSWORD`, `SEED_COMMANDER_PASSWORD` ilə dəyişdirilir).
 
 ## Məlum qalıq risklər
-- Rol əsaslı icazə (DISPATCHER vs COMMANDER) hələ fərqləndirilmir; simulyasiya/reset istehsalda söndürülməli və ya yalnız COMMANDER-ə verilməlidir.
+- Simulyasiya endpoint-ləri istehsalda tamamilə söndürülməlidir (indi `simulation:run` icazəsi ilə qorunur, reset yalnız COMMANDER).
+- Paylanmış botnet (minlərlə fərqli IP) üçün IP limitləri kifayət etmir — növbəti addım: SMS/ASAN doğrulaması və ya CAPTCHA-sız cihaz attestasiyası.
 - Rate-limit proses yaddaşındadır (bir instansiya); miqyaslananda Redis store.
 - Ciddi CSP siyasəti (xəritə plitələri üçün tənzimlənmiş) hələ əlavə olunmayıb.
 - `npm audit`: `zod` 3 və `deepmerge-ts` — təfərrüat `TESTING.md`-də.

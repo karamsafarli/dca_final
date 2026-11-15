@@ -2,7 +2,7 @@ import { useI18n } from '../../i18n/I18nContext';
 import { cn } from '../../lib/utils';
 
 /** Neutral metric strip; a value turns red/amber only when it needs attention. */
-export function KpiStatsGrid({ summary = {} }) {
+export function KpiStatsGrid({ summary = {}, sosLatency = null }) {
   const { t } = useI18n();
   const total = (summary.dispatchedBrigadesCount ?? 0) + (summary.availableBrigadesCount ?? 0);
 
@@ -38,6 +38,12 @@ export function KpiStatsGrid({ summary = {} }) {
       tone: (summary.closedRoadsCount ?? 0) > 0 ? 'warning' : null,
     },
     {
+      label: t('kpiSosLatency'),
+      value: sosLatency?.meanMs != null ? `${Math.round(sosLatency.meanMs)} ms` : '—',
+      sub: sosLatency?.p95Ms != null ? `${t('kpiSosLatencySub')} · p95 ${Math.round(sosLatency.p95Ms)}` : t('kpiSosLatencySub'),
+      tone: sosLatency?.meanMs >= 300 ? 'danger' : sosLatency?.meanMs >= 200 ? 'warning' : null,
+    },
+    {
       label: t('kpiSafeConfirmations'),
       value: summary.safeConfirmationsCount ?? 0,
       sub: t('kpiCitizenStatusSub'),
@@ -46,7 +52,7 @@ export function KpiStatsGrid({ summary = {} }) {
   ];
 
   return (
-    <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-3 xl:grid-cols-6 [&>*]:bg-surface gap-px">
+    <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4 xl:grid-cols-7 [&>*]:bg-surface gap-px">
       {metrics.map((m) => (
         <div key={m.label} className="px-4 py-3">
           <dt className="truncate text-xs text-muted">{m.label}</dt>

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/db.js';
-import { requireDispatcherAuth } from '../middleware/authMiddleware.js';
+import { requireDispatcherAuth, requirePermission } from '../middleware/authMiddleware.js';
 import { createSosLimiter } from '../middleware/rateLimits.js';
 import { updateRoadStatus } from '../services/dispatcherService.js';
 import { getEvacuationPlan } from '../services/evacuationService.js';
@@ -91,7 +91,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');
     const result = await createSosSignal(req.validatedBody, io);
-    res.status(201).json(result);
+    // 201 = new emergency recorded; 200 = merged into the caller's existing SOS
+    res.status(result.duplicate ? 200 : 201).json(result);
   })
 );
 
@@ -120,6 +121,7 @@ router.get(
 router.patch(
   '/traffic/roads/:id/status',
   requireDispatcherAuth,
+  requirePermission('roads:update'),
   validateParams(idParamSchema),
   validateBody(roadStatusSchema),
   asyncHandler(async (req, res) => {

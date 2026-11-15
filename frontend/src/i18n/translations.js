@@ -248,6 +248,7 @@ export const TRANSLATIONS = {
       ASSEMBLY_POINT_NOT_FOUND: 'Toplanış məntəqəsi tapılmadı.',
       ZONE_NOT_FOUND: 'Zona tapılmadı.',
       ROUTING_API_CONTROL_FAILED: 'Simulyasiya olunmuş marşrut API-sinə qoşulmaq mümkün olmadı.',
+      FORBIDDEN: 'Rolunuz bu əməliyyata icazə vermir.',
     },
 
     // Citizen status hero & mobile action bar
@@ -290,6 +291,15 @@ export const TRANSLATIONS = {
     occupancyLabel: 'Doluluq',
     simGroupCrisis: 'Böhran',
     simGroupRouting: 'Marşrut API',
+
+    // Challenge Drop #3: flood protection & RBAC
+    kpiSosLatency: 'SOS API gecikməsi',
+    kpiSosLatencySub: 'orta · hədəf < 300 ms',
+    toastSosBurst: '{count} yeni SOS siqnalı daxil oldu',
+    toastPriorityBurst: '{count} Prioritet #1 SOS daxil oldu',
+    readOnlyMode: 'Yalnız baxış rejimi: rolunuz ({role}) əməliyyat icra etməyə icazə vermir.',
+    toastSosDuplicate: 'SOS siqnalınız artıq qəbul edilib — təkrar göndərmək lazım deyil.',
+    roles: { OBSERVER: 'Müşahidəçi', DISPATCHER: 'Dispetçer', COMMANDER: 'Komandir' },
 
     // Toasts
     toastWelcome: 'Xoş gəldiniz, {name}',
@@ -571,6 +581,7 @@ export const TRANSLATIONS = {
       ASSEMBLY_POINT_NOT_FOUND: 'Assembly point not found.',
       ZONE_NOT_FOUND: 'Zone not found.',
       ROUTING_API_CONTROL_FAILED: 'Could not reach the simulated routing API.',
+      FORBIDDEN: 'Your role does not allow this action.',
     },
 
     // Citizen status hero & mobile action bar
@@ -613,6 +624,15 @@ export const TRANSLATIONS = {
     occupancyLabel: 'Occupancy',
     simGroupCrisis: 'Crisis',
     simGroupRouting: 'Routing API',
+
+    // Challenge Drop #3: flood protection & RBAC
+    kpiSosLatency: 'SOS API latency',
+    kpiSosLatencySub: 'mean · target < 300 ms',
+    toastSosBurst: '{count} new SOS signals received',
+    toastPriorityBurst: '{count} Priority #1 SOS received',
+    readOnlyMode: 'Read-only mode: your role ({role}) cannot perform operations.',
+    toastSosDuplicate: 'Your SOS has already been received — no need to send it again.',
+    roles: { OBSERVER: 'Observer', DISPATCHER: 'Dispatcher', COMMANDER: 'Commander' },
 
     // Toasts
     toastWelcome: 'Welcome, {name}',

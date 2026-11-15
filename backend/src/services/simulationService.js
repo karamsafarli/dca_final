@@ -1,4 +1,5 @@
 import { prisma } from '../config/db.js';
+import { invalidateZoneCache } from './zoneCache.js';
 import { seedDatabase } from '../db/seedData.js';
 import { updateAssemblyPointOccupancy, updateRoadStatus } from './dispatcherService.js';
 import { AppError, notFound } from '../utils/errors.js';
@@ -140,6 +141,7 @@ export async function simulateOccupancySpike(
  */
 export async function resetSystemSimulation(io) {
   await seedDatabase(prisma);
+  invalidateZoneCache();
   const gateway = getRoutingGateway();
   await gateway.client.setSimulationMode('HEALTHY').catch(() => {});
   gateway.reset();

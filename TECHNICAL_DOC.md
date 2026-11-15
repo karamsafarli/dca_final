@@ -30,7 +30,7 @@ Fövqəladə hallar zamanı əsas iki problem mövcuddur:
 | **Node.js 24 + Express** | Backend API | Asinxron I/O performansı, müasir ESM dəstəyi və yüngül servis arxitekturası. |
 | **Prisma ORM + PostgreSQL 16** | Verilənlər Bazası Qatı | Tip-təhlükəsiz sxem idarəetməsi, əlaqəli cədvəllər (`Zone`, `RoadNode`, `RoadSegment`, `AssemblyPoint`, `SosSignal`, `SafetyCheckIn`, `RescueBrigade`, `CriticalAlert`, `Dispatcher`), atomik `$transaction` və Challenge Drop zamanı sürətli sxem yenilənməsi. |
 | **Socket.IO** | Real-Time Kommunikasiya | Yol bağlanması, yeni SOS və Qırmızı Həyəcan hadisələrinin millisaniyələr içində bütün Vətəndaş və Dispetçer ekranlarına çatdırılması. |
-| **Vitest + Supertest + Testing Library** | Avtomatlaşdırılmış Testlər | 62 unit + 36 inteqrasiya (real PostgreSQL, HTTP, Socket.IO) + 19 frontend testi; backend coverage 91.6% (CI-da minimum hədlər). Ətraflı: `TESTING.md`. |
+| **Vitest + Supertest + Testing Library** | Avtomatlaşdırılmış Testlər | 72 unit + 55 inteqrasiya (real PostgreSQL, HTTP, Socket.IO, 600-lük flood) + 24 frontend testi + yük testi; backend coverage 92.3% (CI-da minimum hədlər). Ətraflı: `TESTING.md`. |
 | **GitHub Actions** | CI | Hər push-da unit → inteqrasiya (Postgres servisi) → coverage → frontend test/build → Docker build. |
 | **Docker & Docker Compose** | Konteynerləşdirmə | PostgreSQL 16, Node.js 24 Backend və Nginx/React Frontend xidmətlərinin tək əmrlə tam təkrarlanabilən şəkildə işə salınması. |
 
@@ -43,7 +43,8 @@ Tam təhdid modeli: `SECURITY.md`. Hər bənd avtomatlaşdırılmış testlə yo
 - **Dispetçer autentifikasiyası:** `/api/dispatcher/*`, yol statusu dəyişikliyi və `/api/simulation/*` `requireDispatcherAuth` ilə qorunur (`401 AUTH_REQUIRED`). Parollar `scrypt` + fərdi salt + `timingSafeEqual`. JWT (`HS256`, 8 saat) **yalnız** `HttpOnly`, `SameSite=Lax` cookie-də saxlanılır — login cavabının gövdəsində qaytarılmır.
 - **SOS sahibliyi (IDOR qorunması):** hər SOS üçün birdəfəlik təsadüfi `accessToken` (192 bit) verilir, bazada yalnız SHA-256 heşi saxlanılır və heç bir API cavabında görünmür (Prisma `omit`). "Təhlükəsizəm" və şəxsi Socket.IO kanalı yalnız bu tokenlə işləyir.
 - **Şəxsi məlumatların (PII) təcridi:** ad, telefon, dəqiq koordinat və qeydlər yalnız autentifikasiyalı `dispatchers` Socket.IO otağına göndərilir; vətəndaş yalnız öz SOS-unun PII-siz statusunu alır; ictimai kanalda yalnız ID və səbəb kodları var.
-- **Sui-istifadəyə qarşı limitlər:** dəqiqədə 10-dan çox SOS və 15 dəqiqədə 10 uğursuz giriş → `429 RATE_LIMITED` (`express-rate-limit`, nginx arxasında real IP üçün `trust proxy`). Qırmızı Həyəcan isə yalnız 4 **fərqli** vətəndaşın SOS-u ilə yaranır — bir cihaz saxta həyəcan yarada bilməz.
+- **SOS flood / spam müdafiəsi (Challenge Drop #3):** nginx `limit_req` (IP başına 2 r/s, `X-Forwarded-For` üzərinə yazılır) + `express-rate-limit` (10 SOS/dəq, 15 dəq/10 uğursuz giriş) → `429`; eyni vətəndaş + təhlükə 2 dəq ərzində tək hadisəyə birləşdirilir (single-flight + dublikat indeksi); Qırmızı Həyəcan yalnız 4 **fərqli** vətəndaşla; zona üzrə coalesced qiymətləndirmə. Ölçülmüş: 600 eyni anda SOS → orta 141–252 ms.
+- **RBAC:** `OBSERVER` / `DISPATCHER` / `COMMANDER` icazə matrisi; briqada yönləndirmə, həyəcan icrası, yol/doluluq dəyişikliyi `requirePermission` ilə; rol hər sorğuda bazadan oxunur; JWT `iss`/`aud` yoxlanılır; `403 FORBIDDEN` + audit log.
 - **CORS:** açıq allow-list (`FRONTEND_ORIGIN`); `*` qəbul edilmir, çünki `credentials: true` ilə istənilən sayta dispetçer adından sorğu imkanı verərdi.
 - **Giriş validasiyası (`zod`):** body, query və path parametrləri; yanlış dəyər `400 VALIDATION_ERROR`. Xarici marşrut API-sinin cavabı da sxemlə yoxlanılır. 500 xətalarında daxili mesaj gizlədilir.
 - **Eyni anda əməliyyatlar (race condition):** həyəcan yaradılması zona/məntəqə üzrə PostgreSQL advisory lock ilə, icra isə `SELECT … FOR UPDATE` ilə seriallaşdırılır; briqada və ehtiyat məntəqə şərti `updateMany` ilə atomik tutulur. Nəticə: iki dispetçer eyni anda kliklədikdə yalnız bir briqada göndərilir (inteqrasiya testi ilə sübut olunub).
@@ -56,6 +57,7 @@ Tam təhdid modeli: `SECURITY.md`. Hər bənd avtomatlaşdırılmış testlə yo
 - **Yüngül Yaddaşdaxili Qraf Həllçisi:** Təxliyə marşrutları DB-dən paralel (`Promise.all`) çəkilən qovşaq və yollar üzərində millisaniyələr içində hesablanır.
 - **Real-Time Event Push:** Frontend polling etmir. Vətəndaş ekranı yalnız marşrutu dəyişə bilən 6 hadisə növündə (yol, doluluq, həyəcan icrası, marşrut rejimi, reset) və 400 ms debounce ilə yenilənir — başqa vətəndaşların SOS-ları minlərlə ekranda təkrar hesablama yaratmır.
 - **Circuit Breaker:** xarici API çökəndə istifadəçilər 5 saniyə gözləmir — circuit açıq olduqda cavab ~5 ms-də lokal ehtiyatdan verilir.
+- **Kütləvi yük (Drop #3):** coalesced böhran qiymətləndirməsi, 30 ms gecikmə büdcəsi, zona keşi, əlavə JOIN-siz `create`, Prisma pool 40, istehsalda yalnız xəta loqları, dispetçer panelinin throttle ilə yenilənməsi. Gecikmə `Server-Timing` və `GET /api/metrics/latency` ilə canlı ölçülür (konsolda göstərilir).
 
 ---
 
@@ -69,6 +71,8 @@ Tam təhdid modeli: `SECURITY.md`. Hər bənd avtomatlaşdırılmış testlə yo
 | Xarici marşrut API-si ayrıca konteynerdə | Prosesdaxili mock | Çöküş real şəbəkə xətasıdır (503, timeout, connection refused) — demo və testlər realdır. |
 | Socket.IO otaqları (`dispatchers`, `sos:<id>`) | Hamıya yayım | PII yalnız səlahiyyətli operatorlara çatır. |
 | JWT HttpOnly cookie-də | `localStorage` | XSS zamanı token oğurlana bilmir. |
+| Coalesced qiymətləndirmə + gecikmə büdcəsi | Hər SOS üçün sinxron, lock-lu qiymətləndirmə | Ölçmə göstərdi: lock gözləyən tranzaksiyalar pool-u tükəndirir (245 × HTTP 500, 1.5 s orta). İndi 500 SOS → ~2 qiymətləndirmə, orta < 300 ms, nəticə eyni. |
+| Rol bazadan, token-dən yox | JWT-dəki rola güvənmək | Rolun endirilməsi/deaktivasiya dərhal qüvvəyə minir. |
 | Hədlər `config/constants.js`-də | Kodda səpələnmiş rəqəmlər | Yeni challenge drop-da həddin dəyişməsi bir sətirdir; testlər dəqiq dəyərləri yoxlayır. |
 
 ---
@@ -76,7 +80,7 @@ Tam təhdid modeli: `SECURITY.md`. Hər bənd avtomatlaşdırılmış testlə yo
 ## 5. Məlum Məhdudiyyətlər (dürüst qiymətləndirmə)
 
 - Sxem `prisma db push` ilə tətbiq olunur; istehsal üçün `prisma migrate` tarixçəsi lazımdır.
-- Rate-limit və marşrut keşi proses yaddaşındadır — çox instansiyalı yerləşdirmədə Redis (və Socket.IO Redis adapter) lazımdır.
+- Rate-limit, dublikat indeksi, coalescing və marşrut keşi proses yaddaşındadır — çox instansiyalı yerləşdirmədə Redis (və Socket.IO Redis adapter) lazımdır; DB advisory lock-lar artıq instansiyalar arası təhlükəsizdir.
 - Yol seqmentlərinin həndəsəsi sadələşdirilib (qovşaqlar arası xətt); real küçə həndəsəsi OSRM ixracı ilə əlavə oluna bilər.
 - Simulyasiya olunmuş xarici API yol məlumatını eyni bazadan oxuyur (real provayder öz məlumatına malikdir).
 - `npm audit`: `zod` 3 (major yeniləmə tələb edir) və Prisma alətlərindəki `deepmerge-ts` — təsir və azaltma tədbirləri `TESTING.md`-də.
