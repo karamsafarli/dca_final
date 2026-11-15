@@ -1,14 +1,21 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../config/db.js';
 import { requireDispatcherAuth } from '../middleware/authMiddleware.js';
-import { executeCriticalAlert } from '../services/crisisEngineService.js';
+import {
+  dismissCriticalAlert,
+  executeCriticalAlert,
+} from '../services/crisisEngineService.js';
 import {
   getDispatcherDashboard,
   updateAssemblyPointOccupancy,
 } from '../services/dispatcherService.js';
 import { dispatchBrigadeToSos } from '../services/sosService.js';
-import { asyncHandler, validateBody } from '../utils/http.js';
+import {
+  asyncHandler,
+  idParamSchema,
+  validateBody,
+  validateParams,
+} from '../utils/http.js';
 
 const router = Router();
 router.use('/dispatcher', requireDispatcherAuth);
@@ -33,11 +40,12 @@ router.get(
 
 router.patch(
   '/dispatcher/shelters/:id/occupancy',
+  validateParams(idParamSchema),
   validateBody(occupancySchema),
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');
     const result = await updateAssemblyPointOccupancy(
-      req.params.id,
+      req.validatedParams.id,
       req.validatedBody,
       io
     );
@@ -47,11 +55,12 @@ router.patch(
 
 router.post(
   '/dispatcher/sos/:id/dispatch',
+  validateParams(idParamSchema),
   validateBody(dispatchSosSchema),
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');
     const result = await dispatchBrigadeToSos(
-      req.params.id,
+      req.validatedParams.id,
       req.validatedBody.brigadeId,
       io
     );
@@ -61,25 +70,20 @@ router.post(
 
 router.post(
   '/dispatcher/alerts/:id/execute',
+  validateParams(idParamSchema),
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');
-    const result = await executeCriticalAlert(req.params.id, io, req.dispatcher);
+    const result = await executeCriticalAlert(req.validatedParams.id, io, req.dispatcher);
     res.json(result);
   })
 );
 
 router.patch(
   '/dispatcher/alerts/:id/dismiss',
+  validateParams(idParamSchema),
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');
-    const alert = await prisma.criticalAlert.update({
-      where: { id: Number(req.params.id) },
-      data: { status: 'DISMISSED' },
-      include: { zone: true, assemblyPoint: true },
-    });
-    if (io) {
-      io.emit('state:updated', { reason: 'ALERT_DISMISSED', alertId: alert.id });
-    }
+    const alert = await dismissCriticalAlert(req.validatedParams.id, io, req.dispatcher);
     res.json({ alert });
   })
 );

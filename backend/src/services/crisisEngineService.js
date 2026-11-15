@@ -1,5 +1,8 @@
 import { CRISIS_THRESHOLDS } from '../config/constants.js';
-import { prisma } from '../config/db.js';
+import { lockKey, prisma } from '../config/db.js';
+import { emitAlertCreated, emitAlertResolved } from '../realtime/events.js';
+import { conflict, notFound } from '../utils/errors.js';
+import { claimBrigade } from './brigadeAllocation.js';
 import {
   calculateOccupancyPercent,
   haversineDistanceMeters,
@@ -9,9 +12,43 @@ export const RED_ALERT_TITLE =
   'Qırmızı Həyəcan: Əlavə xilasetmə briqadası göndər və yeni toplanış nöqtəsi aç';
 
 /**
- * Pure detector for SOS clustering: >= 4 SOS signals in 5 min within same zone OR 500m radius.
+ * Keep only the most recent signal per citizen, so the rule counts *distinct*
+ * people ("ən azı 4 fərqli SOS siqnalı") and one person tapping SOS repeatedly
+ * cannot raise a Red Alert alone. Signals without a citizen code count individually.
  */
-export function detectSosCluster(triggerSos, activeRecentSignals) {
+export function dedupeSignalsByCitizen(signals) {
+  const latest = new Map();
+  for (const s of signals) {
+    const key = s.citizenCode ? `c:${s.citizenCode}` : `id:${s.id}`;
+    const prev = latest.get(key);
+    if (!prev || new Date(s.createdAt ?? 0) >= new Date(prev.createdAt ?? 0)) {
+      latest.set(key, s);
+    }
+  }
+  return [...latest.values()];
+}
+
+/**
+ * Start of the counting window: the last 5 minutes, but never earlier than the
+ * moment an operator last executed/dismissed a cluster alert for the zone.
+ * Signals already handled by that decision must not immediately re-raise an alert.
+ */
+export function clusterWindowStart(now, lastResolvedAt) {
+  const timeWindow = new Date(
+    now.getTime() - CRISIS_THRESHOLDS.SOS_CLUSTER_WINDOW_MINUTES * 60 * 1000
+  );
+  if (lastResolvedAt && new Date(lastResolvedAt) > timeWindow) {
+    return new Date(lastResolvedAt);
+  }
+  return timeWindow;
+}
+
+/**
+ * Pure detector for SOS clustering: >= 4 distinct citizens' SOS in 5 min within
+ * the same zone OR a 500 m radius of the newest signal.
+ */
+export function detectSosCluster(triggerSos, recentSignals) {
+  const activeRecentSignals = dedupeSignalsByCitizen(recentSignals);
   const sameZone = activeRecentSignals.filter(
     (s) => s.zoneId === triggerSos.zoneId
   );
@@ -58,82 +95,83 @@ export function detectCapacityOverflow(currentOccupancy, capacity) {
 
 /**
  * Evaluate SOS cluster conditions after a new SOS signal arrives.
+ * Runs under a per-zone advisory lock so concurrent SOS requests can never
+ * create duplicate ACTIVE alerts for the same zone.
  */
 export async function evaluateSosCrisis(triggerSos, io) {
-  const windowStart = new Date(
-    Date.now() - CRISIS_THRESHOLDS.SOS_CLUSTER_WINDOW_MINUTES * 60 * 1000
-  );
+  const outcome = await prisma.$transaction(async (tx) => {
+    await lockKey(tx, `sos-cluster:${triggerSos.zoneId}`);
 
-  const recentActiveSignals = await prisma.sosSignal.findMany({
-    where: {
-      citizenStatus: 'SOS',
-      status: { not: 'RESOLVED' },
-      createdAt: { gte: windowStart },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  const cluster = detectSosCluster(triggerSos, recentActiveSignals);
-  if (!cluster) return null;
-
-  const zone = await prisma.zone.findUnique({
-    where: { id: triggerSos.zoneId },
-  });
-
-  const existingActive = await prisma.criticalAlert.findFirst({
-    where: {
-      alertType: 'SOS_CLUSTER',
-      zoneId: triggerSos.zoneId,
-      status: 'ACTIVE',
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  const reasonDetail = cluster.triggeredByRadius
-    ? `500 metr radiusda son 5 dəqiqədə ${cluster.sosCount} aktiv SOS siqnalı qeydə alındı`
-    : `${zone?.name || 'Zona'} üzrə son 5 dəqiqədə ${cluster.sosCount} aktiv SOS siqnalı qeydə alındı`;
-
-  let alert;
-  if (existingActive) {
-    alert = await prisma.criticalAlert.update({
-      where: { id: existingActive.id },
-      data: {
-        sosCount: cluster.sosCount,
-        centerLat: cluster.centerLat,
-        centerLng: cluster.centerLng,
-        message: `${reasonDetail}. Dərhal müdaxilə tələb olunur!`,
+    const lastResolved = await tx.criticalAlert.findFirst({
+      where: {
+        alertType: 'SOS_CLUSTER',
+        zoneId: triggerSos.zoneId,
+        resolvedAt: { not: null },
       },
-      include: { zone: true, assemblyPoint: true },
+      orderBy: { resolvedAt: 'desc' },
+      select: { resolvedAt: true },
     });
-  } else {
-    alert = await prisma.$transaction(async (tx) => {
-      await tx.zone.update({
-        where: { id: triggerSos.zoneId },
-        data: { riskLevel: 'CRITICAL' },
-      });
 
-      return tx.criticalAlert.create({
+    const recentActiveSignals = await tx.sosSignal.findMany({
+      where: {
+        citizenStatus: 'SOS',
+        status: { not: 'RESOLVED' },
+        createdAt: { gt: clusterWindowStart(new Date(), lastResolved?.resolvedAt) },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const cluster = detectSosCluster(triggerSos, recentActiveSignals);
+    if (!cluster) return null;
+
+    const zone = await tx.zone.findUnique({ where: { id: triggerSos.zoneId } });
+    const existingActive = await tx.criticalAlert.findFirst({
+      where: { alertType: 'SOS_CLUSTER', zoneId: triggerSos.zoneId, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const reasonDetail = cluster.triggeredByRadius
+      ? `500 metr radiusda son 5 dəqiqədə ${cluster.sosCount} fərqli vətəndaşdan aktiv SOS siqnalı qeydə alındı`
+      : `${zone?.name || 'Zona'} üzrə son 5 dəqiqədə ${cluster.sosCount} fərqli vətəndaşdan aktiv SOS siqnalı qeydə alındı`;
+    const message = `${reasonDetail}. Dərhal müdaxilə tələb olunur!`;
+
+    if (existingActive) {
+      const alert = await tx.criticalAlert.update({
+        where: { id: existingActive.id },
         data: {
-          alertType: 'SOS_CLUSTER',
-          zoneId: triggerSos.zoneId,
+          sosCount: cluster.sosCount,
           centerLat: cluster.centerLat,
           centerLng: cluster.centerLng,
-          sosCount: cluster.sosCount,
-          title: RED_ALERT_TITLE,
-          message: `${reasonDetail}. Dərhal müdaxilə tələb olunur!`,
-          status: 'ACTIVE',
+          message,
         },
         include: { zone: true, assemblyPoint: true },
       });
+      return { alert, isNew: false };
+    }
+
+    await tx.zone.update({
+      where: { id: triggerSos.zoneId },
+      data: { riskLevel: 'CRITICAL' },
     });
-  }
+    const alert = await tx.criticalAlert.create({
+      data: {
+        alertType: 'SOS_CLUSTER',
+        zoneId: triggerSos.zoneId,
+        centerLat: cluster.centerLat,
+        centerLng: cluster.centerLng,
+        sosCount: cluster.sosCount,
+        title: RED_ALERT_TITLE,
+        message,
+        status: 'ACTIVE',
+      },
+      include: { zone: true, assemblyPoint: true },
+    });
+    return { alert, isNew: true };
+  });
 
-  if (io) {
-    io.to('dispatchers').emit('alert:created', alert);
-    io.emit('state:updated', { reason: 'SOS_CLUSTER', zoneId: triggerSos.zoneId });
-  }
-
-  return alert;
+  if (!outcome) return null;
+  emitAlertCreated(io, outcome.alert, 'SOS_CLUSTER');
+  return outcome.alert;
 }
 
 /**
@@ -157,119 +195,117 @@ export async function evaluateCapacityCrisis(assemblyPointId, io) {
     });
   }
 
-  const existingActive = await prisma.criticalAlert.findFirst({
-    where: {
-      alertType: 'CAPACITY_OVERFLOW',
-      assemblyPointId: point.id,
-      status: 'ACTIVE',
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
   const message = `${point.name} (${point.zone.name}) doluluğu ${overflow.occupancyPercent}%-ə çatdı (95% kritik həddi keçdi).`;
 
-  let alert;
-  if (existingActive) {
-    alert = await prisma.criticalAlert.update({
-      where: { id: existingActive.id },
+  const alert = await prisma.$transaction(async (tx) => {
+    await lockKey(tx, `capacity:${point.id}`);
+
+    const existingActive = await tx.criticalAlert.findFirst({
+      where: { alertType: 'CAPACITY_OVERFLOW', assemblyPointId: point.id, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existingActive) {
+      return tx.criticalAlert.update({
+        where: { id: existingActive.id },
+        data: { occupancyPercent: overflow.occupancyPercent, message },
+        include: { zone: true, assemblyPoint: true },
+      });
+    }
+
+    await tx.zone.update({
+      where: { id: point.zoneId },
+      data: { riskLevel: 'CRITICAL' },
+    });
+    return tx.criticalAlert.create({
       data: {
+        alertType: 'CAPACITY_OVERFLOW',
+        zoneId: point.zoneId,
+        assemblyPointId: point.id,
+        centerLat: point.lat,
+        centerLng: point.lng,
         occupancyPercent: overflow.occupancyPercent,
+        title: RED_ALERT_TITLE,
         message,
+        status: 'ACTIVE',
       },
       include: { zone: true, assemblyPoint: true },
     });
-  } else {
-    alert = await prisma.$transaction(async (tx) => {
-      await tx.zone.update({
-        where: { id: point.zoneId },
-        data: { riskLevel: 'CRITICAL' },
-      });
+  });
 
-      return tx.criticalAlert.create({
-        data: {
-          alertType: 'CAPACITY_OVERFLOW',
-          zoneId: point.zoneId,
-          assemblyPointId: point.id,
-          centerLat: point.lat,
-          centerLng: point.lng,
-          occupancyPercent: overflow.occupancyPercent,
-          title: RED_ALERT_TITLE,
-          message,
-          status: 'ACTIVE',
-        },
-        include: { zone: true, assemblyPoint: true },
-      });
-    });
-  }
-
-  if (io) {
-    io.to('dispatchers').emit('alert:created', alert);
-    io.emit('state:updated', {
-      reason: 'CAPACITY_OVERFLOW',
-      assemblyPointId: point.id,
-    });
-  }
-
+  emitAlertCreated(io, alert, 'CAPACITY_OVERFLOW');
   return alert;
 }
 
 /**
+ * Atomically switch one STANDBY assembly point to OPEN (same zone preferred).
+ * Conditional update = lock: two concurrent executions never open the same point.
+ */
+async function claimStandbyPoint(tx, zoneId) {
+  const standby = await tx.assemblyPoint.findMany({
+    where: { status: 'STANDBY' },
+    orderBy: { id: 'asc' },
+  });
+  const ranked = [
+    ...standby.filter((p) => p.zoneId === zoneId),
+    ...standby.filter((p) => p.zoneId !== zoneId),
+  ];
+  for (const point of ranked) {
+    const { count } = await tx.assemblyPoint.updateMany({
+      where: { id: point.id, status: 'STANDBY' },
+      data: { status: 'OPEN' },
+    });
+    if (count === 1) return tx.assemblyPoint.findUnique({ where: { id: point.id } });
+  }
+  return null;
+}
+
+/**
  * One-click Red Alert execution: dispatch additional rescue brigade + open new assembly point.
+ * The alert row is locked (SELECT ... FOR UPDATE), so simultaneous clicks by two
+ * dispatchers result in exactly one execution; the second gets `alreadyExecuted`.
  */
 export async function executeCriticalAlert(alertId, io, dispatcher = null) {
+  const id = Number(alertId);
   const result = await prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw`SELECT id FROM critical_alerts WHERE id = ${id} FOR UPDATE`;
+    if (locked.length === 0) {
+      throw notFound('ALERT_NOT_FOUND', 'Critical alert not found');
+    }
+
     const alert = await tx.criticalAlert.findUnique({
-      where: { id: Number(alertId) },
+      where: { id },
       include: { zone: true, assemblyPoint: true },
     });
-
-    if (!alert) {
-      const error = new Error('Critical alert not found');
-      error.statusCode = 404;
-      throw error;
-    }
 
     if (alert.status === 'EXECUTED') {
       return { alert, alreadyExecuted: true };
     }
+    if (alert.status === 'DISMISSED') {
+      throw conflict('ALERT_DISMISSED', 'Dismissed alerts cannot be executed');
+    }
 
     // 1. Dispatch an available/standby brigade (prefer same zone)
-    let brigade = await tx.rescueBrigade.findFirst({
-      where: {
-        zoneId: alert.zoneId,
-        status: { in: ['STANDBY', 'AVAILABLE'] },
-      },
-      orderBy: { status: 'asc' },
+    const missionLocation = {
+      zoneId: alert.zoneId,
+      lat: alert.centerLat,
+      lng: alert.centerLng,
+    };
+    let brigade = await claimBrigade(tx, {
+      zoneId: alert.zoneId,
+      preferUnitTypes: ['SEARCH_RESCUE', 'GENERAL'],
+      data: missionLocation,
     });
 
     if (!brigade) {
-      brigade = await tx.rescueBrigade.findFirst({
-        where: { status: { in: ['STANDBY', 'AVAILABLE'] } },
-        orderBy: { status: 'asc' },
-      });
-    }
-
-    if (brigade) {
-      brigade = await tx.rescueBrigade.update({
-        where: { id: brigade.id },
-        data: {
-          status: 'DISPATCHED',
-          zoneId: alert.zoneId,
-          lat: alert.centerLat,
-          lng: alert.centerLng,
-        },
-      });
-    } else {
-      const suffix = String(Date.now()).slice(-4);
+      const suffix = `${alert.id}-${String(Date.now()).slice(-4)}`;
       brigade = await tx.rescueBrigade.create({
         data: {
           code: `BRG-EMG-${suffix}`,
           name: `${alert.zone.name} Ehtiyat Çevik Briqadası #${suffix}`,
           unitType: 'SEARCH_RESCUE',
-          zoneId: alert.zoneId,
-          lat: alert.centerLat,
-          lng: alert.centerLng,
           status: 'DISPATCHED',
+          ...missionLocation,
         },
       });
     }
@@ -287,33 +323,15 @@ export async function executeCriticalAlert(alertId, io, dispatcher = null) {
       },
     });
 
-    // 2. Open a STANDBY assembly point in the zone (or provision mobile point)
-    let openedPoint = await tx.assemblyPoint.findFirst({
-      where: {
-        zoneId: alert.zoneId,
-        status: 'STANDBY',
-      },
-      orderBy: { id: 'asc' },
-    });
+    // 2. Open a STANDBY assembly point (same zone first) or provision a mobile one
+    let openedPoint = await claimStandbyPoint(tx, alert.zoneId);
 
     if (!openedPoint) {
-      openedPoint = await tx.assemblyPoint.findFirst({
-        where: { status: 'STANDBY' },
+      const nearestNode = await tx.roadNode.findFirst({
+        where: { zoneId: alert.zoneId },
         orderBy: { id: 'asc' },
       });
-    }
-
-    if (openedPoint) {
-      openedPoint = await tx.assemblyPoint.update({
-        where: { id: openedPoint.id },
-        data: { status: 'OPEN' },
-      });
-    } else {
-      const zoneNodes = await tx.roadNode.findMany({
-        where: { zoneId: alert.zoneId },
-      });
-      const nearestNode = zoneNodes[0] || null;
-      const suffix = String(Date.now()).slice(-4);
+      const suffix = `${alert.id}-${String(Date.now()).slice(-4)}`;
       openedPoint = await tx.assemblyPoint.create({
         data: {
           code: `AP-MOB-${suffix}`,
@@ -354,11 +372,13 @@ export async function executeCriticalAlert(alertId, io, dispatcher = null) {
         : null,
     };
 
+    const now = new Date();
     const updatedAlert = await tx.criticalAlert.update({
       where: { id: alert.id },
       data: {
         status: 'EXECUTED',
-        executedAt: new Date(),
+        executedAt: now,
+        resolvedAt: now,
         executedByDispatcherId: dispatcher?.id ?? null,
         actionTaken,
       },
@@ -378,13 +398,44 @@ export async function executeCriticalAlert(alertId, io, dispatcher = null) {
     };
   });
 
-  if (io && !result.alreadyExecuted) {
-    io.emit('alert:executed', result);
-    io.emit('state:updated', {
-      reason: 'ALERT_EXECUTED',
-      alertId: result.alert.id,
-    });
+  if (!result.alreadyExecuted) {
+    emitAlertResolved(io, result, 'ALERT_EXECUTED');
   }
 
   return result;
+}
+
+/**
+ * Operator decides an ACTIVE alert needs no action. Recorded with who/when;
+ * signals before this moment no longer count toward a new cluster alert.
+ */
+export async function dismissCriticalAlert(alertId, io, dispatcher = null) {
+  const id = Number(alertId);
+  const now = new Date();
+  const { count } = await prisma.criticalAlert.updateMany({
+    where: { id, status: 'ACTIVE' },
+    data: {
+      status: 'DISMISSED',
+      resolvedAt: now,
+      actionTaken: {
+        dismissedBy: dispatcher
+          ? { id: dispatcher.id, username: dispatcher.username, badgeCode: dispatcher.badgeCode }
+          : null,
+        dismissedAt: now.toISOString(),
+      },
+    },
+  });
+
+  if (count === 0) {
+    const existing = await prisma.criticalAlert.findUnique({ where: { id } });
+    if (!existing) throw notFound('ALERT_NOT_FOUND', 'Critical alert not found');
+    throw conflict('ALERT_NOT_ACTIVE', 'Only active alerts can be dismissed');
+  }
+
+  const alert = await prisma.criticalAlert.findUnique({
+    where: { id },
+    include: { zone: true, assemblyPoint: true },
+  });
+  emitAlertResolved(io, { alert }, 'ALERT_DISMISSED');
+  return alert;
 }

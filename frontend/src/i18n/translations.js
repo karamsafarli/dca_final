@@ -149,6 +149,10 @@ export const TRANSLATIONS = {
     redAlertTag: 'KRİTİK BÖHRAN ALQORİTMİ',
     redAlertTitle:
       'Qırmızı Həyəcan: Əlavə xilasetmə briqadası göndər və yeni toplanış nöqtəsi aç',
+    redAlertMsgCapacity:
+      '{point} doluluğu {percent}%-ə çatdı (95% kritik həddi keçdi). Dərhal ehtiyat tutum tələb olunur.',
+    redAlertMsgCluster:
+      '{zone} üzrə son 5 dəqiqədə {count} fərqli vətəndaşdan SOS siqnalı qeydə alındı (500 m radius / eyni zona). Dərhal müdaxilə tələb olunur!',
     redAlertExecuteBtn: 'Təsdiqlə və İcra Et',
     closeBtn: 'Bağla',
     executedLabel: 'İcra Edildi',
@@ -363,6 +367,10 @@ export const TRANSLATIONS = {
     redAlertTag: 'CRITICAL CRISIS ALGORITHM',
     redAlertTitle:
       'Red Alert: Dispatch additional rescue brigade and open new assembly point',
+    redAlertMsgCapacity:
+      '{point} occupancy reached {percent}% (above the 95% critical threshold). Reserve capacity is needed immediately.',
+    redAlertMsgCluster:
+      'SOS signals from {count} different citizens in {zone} within 5 minutes (500 m radius / same zone). Immediate response required!',
     redAlertExecuteBtn: 'Approve & Execute',
     closeBtn: 'Dismiss',
     executedLabel: 'Executed',

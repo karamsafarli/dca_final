@@ -223,6 +223,8 @@ model SosSignal {
   notes             String?
   status            SosProcessStatus @default(PENDING)
   assignedBrigadeId Int?             @map("assigned_brigade_id")
+  /// SHA-256 of the one-time token handed to the citizen; proves SOS ownership.
+  accessTokenHash   String?          @map("access_token_hash")
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
 
@@ -251,6 +253,8 @@ model CriticalAlert {
   executedByDispatcherId Int?        @map("executed_by_dispatcher_id")
   createdAt              DateTime    @default(now()) @map("created_at")
   executedAt             DateTime?   @map("executed_at")
+  /// Set when the alert is executed or dismissed; SOS signals before it are "handled".
+  resolvedAt             DateTime?   @map("resolved_at")
 
   zone                 Zone           @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   assemblyPoint        AssemblyPoint? @relation(fields: [assemblyPointId], references: [id], onDelete: SetNull)
@@ -258,5 +262,6 @@ model CriticalAlert {
 
   @@index([status, createdAt])
   @@index([zoneId])
+  @@index([alertType, zoneId, resolvedAt])
   @@map("critical_alerts")
 }

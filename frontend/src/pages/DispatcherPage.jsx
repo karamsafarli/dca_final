@@ -12,9 +12,7 @@ import { socket } from '../lib/socket';
 import { crisisApi } from '../services/crisisApi';
 
 export function DispatcherPage({ onAlertsCountChange }) {
-  const { lang, t } = useI18n();
-  const langRef = useRef(lang);
-  langRef.current = lang;
+  const { t } = useI18n();
   const tRef = useRef(t);
   tRef.current = t;
 
@@ -47,9 +45,8 @@ export function DispatcherPage({ onAlertsCountChange }) {
       loadDashboard({ silent: true });
     };
 
-    const handleAlertCreated = (alert) => {
-      const msg = langRef.current === 'en' ? tRef.current('redAlertTitle') : alert.title;
-      toast.error(msg, { autoClose: 7000 });
+    const handleAlertCreated = () => {
+      toast.error(tRef.current('redAlertTitle'), { autoClose: 7000 });
       loadDashboard({ silent: true });
     };
 

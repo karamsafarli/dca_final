@@ -1,22 +1,22 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { createApp } from '../src/app.js';
+import { createApp } from '../../src/app.js';
 import {
   hashPassword,
   signDispatcherToken,
   verifyDispatcherToken,
   verifyPassword,
-} from '../src/services/authService.js';
+} from '../../src/services/authService.js';
 import {
   detectCapacityOverflow,
   detectSosCluster,
-} from '../src/services/crisisEngineService.js';
-import { evaluateEvacuationOptions } from '../src/services/evacuationService.js';
+} from '../../src/services/crisisEngineService.js';
+import { evaluateEvacuationOptions } from '../../src/services/evacuationService.js';
 import {
   calculateOccupancyPercent,
   haversineDistanceMeters,
-} from '../src/services/geometryService.js';
-import { computeShortestPath } from '../src/services/routingService.js';
+} from '../../src/services/geometryService.js';
+import { computeShortestPath } from '../../src/services/routingService.js';
 
 const MOCK_NODES = [
   { id: 1, code: 'N1', name: 'Node 1', zoneId: 1, lat: 40.375, lng: 49.815 },

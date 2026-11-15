@@ -5,7 +5,13 @@ import { requireDispatcherAuth } from '../middleware/authMiddleware.js';
 import { updateRoadStatus } from '../services/dispatcherService.js';
 import { getEvacuationPlan } from '../services/evacuationService.js';
 import { createSosSignal, markCitizenSafe } from '../services/sosService.js';
-import { asyncHandler, validateBody } from '../utils/http.js';
+import {
+  asyncHandler,
+  idParamSchema,
+  validateBody,
+  validateParams,
+  validateQuery,
+} from '../utils/http.js';
 
 const router = Router();
 
@@ -24,11 +30,27 @@ const createSosSchema = z.object({
 const safeStatusSchema = z
   .object({
     sosId: z.coerce.number().int().positive().optional(),
+    accessToken: z.string().min(16).max(128).optional(),
     citizenCode: z.string().min(1).max(64).optional(),
+    zoneId: z.coerce.number().int().positive().optional(),
+    lat: z.coerce.number().min(-90).max(90).optional(),
+    lng: z.coerce.number().min(-180).max(180).optional(),
   })
   .refine((data) => data.sosId || data.citizenCode, {
     message: 'Either sosId or citizenCode must be provided',
+  })
+  .refine((data) => !data.sosId || data.accessToken, {
+    message: 'accessToken is required to update an SOS',
+    path: ['accessToken'],
   });
+
+const evacuationPlanQuerySchema = z.object({
+  zoneId: z.coerce.number().int().positive().optional(),
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+  accessibleOnly: z.enum(['true', 'false']).optional(),
+  citizenCategory: z.enum(['STANDARD', 'SPECIAL_CARE']).optional(),
+});
 
 const roadStatusSchema = z.object({
   status: z.enum(['OPEN', 'CONGESTED', 'CLOSED']),
@@ -45,8 +67,9 @@ router.get(
 
 router.get(
   '/citizen/evacuation-plan',
+  validateQuery(evacuationPlanQuerySchema),
   asyncHandler(async (req, res) => {
-    const { zoneId, lat, lng, accessibleOnly, citizenCategory } = req.query;
+    const { zoneId, lat, lng, accessibleOnly, citizenCategory } = req.validatedQuery;
     const plan = await getEvacuationPlan({
       zoneId,
       lat,
@@ -93,10 +116,11 @@ router.get(
 router.patch(
   '/traffic/roads/:id/status',
   requireDispatcherAuth,
+  validateParams(idParamSchema),
   validateBody(roadStatusSchema),
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');
-    const updated = await updateRoadStatus(req.params.id, req.validatedBody, io);
+    const updated = await updateRoadStatus(req.validatedParams.id, req.validatedBody, io);
     res.json({ road: updated });
   })
 );

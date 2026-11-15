@@ -109,12 +109,21 @@ Brauzerdə açın: http://localhost:5173 (Vite proksisi `/api` və `/socket.io`-
 
 ## 3. Testlərin İcra Olunması (Testing)
 
-Backend-in marşrutlaşdırma, 90%/95% doluluq hədləri, 500m radiusda 4 SOS klasterləşməsi və API validasiyası üzrə avtomatlaşdırılmış testlərini icra etmək üçün:
+| Paket | Əmr | Nə yoxlanılır |
+|---|---|---|
+| Backend unit | `cd backend && npm test` | Dijkstra/rerouting, 90%/95% hədləri, 4 **fərqli** vətəndaş qaydası, klaster pəncərəsi, briqada seçimi, CORS, auth, validasiya |
+| Backend integration | `cd backend && npm run test:integration` | Real PostgreSQL üzərində: SOS → Qırmızı Həyəcan, eyni anda icra (race-condition), SOS sahiblik tokeni (IDOR), Socket.IO kanal izolyasiyası (PII sızmır) |
+| Frontend | `cd frontend && npm test` | AZ/EN lüğət paritet testi, Qırmızı Həyəcan paneli (Vitest + Testing Library) |
+
+İnteqrasiya testləri ayrıca `urban_crisis_test` bazasından istifadə edir (əsas bazaya toxunmur):
 
 ```bash
-cd backend
-npm test
+docker compose up -d postgres
+docker exec urban_crisis_postgres psql -U crisis_user -d urban_crisis -c "CREATE DATABASE urban_crisis_test"
+cd backend && npm run test:integration
 ```
+
+Fərqli ünvan üçün `TEST_DATABASE_URL` mühit dəyişənini təyin edin (adı `_test` ilə bitməlidir — qoruyucu yoxlama).
 
 ---
 

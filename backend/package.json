@@ -10,7 +10,9 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push --skip-generate",
     "prisma:seed": "node prisma/seed.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.js",
+    "test:all": "npm test && npm run test:integration"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "prisma": "^6.6.0",
+    "socket.io-client": "^4.8.1",
     "supertest": "^7.0.0",
     "vitest": "^3.0.9"
   }

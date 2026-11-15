@@ -2,6 +2,20 @@ import { CheckCircle2, Siren, X } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { formatTimeAgo } from '../../lib/utils';
 
+/** Build the alert text from structured fields so it follows the UI language. */
+export function describeAlert(alert, t) {
+  if (alert.alertType === 'CAPACITY_OVERFLOW') {
+    return t('redAlertMsgCapacity', {
+      point: alert.assemblyPoint?.name || alert.zone?.name || '—',
+      percent: alert.occupancyPercent ?? '>95',
+    });
+  }
+  return t('redAlertMsgCluster', {
+    zone: alert.zone?.name || '—',
+    count: alert.sosCount || 4,
+  });
+}
+
 export function RedAlertBanner({ alerts = [], onExecute, onDismiss, isBusy }) {
   const { lang, t } = useI18n();
   const activeAlerts = alerts.filter((a) => a.status === 'ACTIVE');
@@ -14,13 +28,8 @@ export function RedAlertBanner({ alerts = [], onExecute, onDismiss, isBusy }) {
   return (
     <div className="space-y-2.5">
       {activeAlerts.map((alert) => {
-        const displayTitle = lang === 'en' ? t('redAlertTitle') : alert.title;
-        const displayMessage =
-          lang === 'en'
-            ? alert.alertType === 'SHELTER_CRITICAL_95'
-              ? `${alert.assemblyPoint?.name || alert.zone?.name || 'Assembly point'} occupancy reached ${alert.occupancyPercent}% (>95%). Immediate reserve capacity required.`
-              : `${alert.sosCount || 4}+ SOS signals detected within 500m in ${alert.zone?.name || 'zone'} within 5 minutes.`
-            : alert.message;
+        const displayTitle = t('redAlertTitle');
+        const displayMessage = describeAlert(alert, t);
 
         return (
           <div

@@ -15,10 +15,24 @@ const CITIZEN_CATEGORY_KEY = 'urban_crisis_citizen_category';
 
 function getOrCreateCitizenCode() {
   const existing = localStorage.getItem(CITIZEN_CODE_KEY);
-  if (existing) return existing;
-  const generated = `CIT-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  if (existing && existing.length >= 20) return existing;
+  // getRandomValues also works on plain-http LAN demos, unlike randomUUID
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const generated = `CIT-${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
   localStorage.setItem(CITIZEN_CODE_KEY, generated);
   return generated;
+}
+
+/** Restore the citizen's own SOS; entries without an access token are unusable. */
+function loadStoredSos() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ACTIVE_SOS_KEY) || 'null');
+    if (saved?.id && saved?.accessToken) return saved;
+  } catch {
+    // corrupted entry
+  }
+  localStorage.removeItem(ACTIVE_SOS_KEY);
+  return null;
 }
 
 export function CitizenPage() {
@@ -43,14 +57,7 @@ export function CitizenPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSafeConfirmedAt, setLastSafeConfirmedAt] = useState(null);
 
-  const [activeSos, setActiveSos] = useState(() => {
-    try {
-      const saved = localStorage.getItem(ACTIVE_SOS_KEY);
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [activeSos, setActiveSos] = useState(loadStoredSos);
 
   const loadEvacuationPlan = useCallback(
     async ({ zoneId, coord, category, silent = false }) => {
@@ -130,25 +137,40 @@ export function CitizenPage() {
       }
     };
 
-    const handleSosUpdated = (updatedSos) => {
+    // Private, PII-free status of this citizen's own SOS (see citizen:watch below)
+    const handleSosStatus = (status) => {
       setActiveSos((prev) => {
-        if (!prev || prev.id !== updatedSos.id) return prev;
-        if (updatedSos.citizenStatus === 'SAFE' || updatedSos.status === 'RESOLVED') {
+        if (!prev || prev.id !== status.id) return prev;
+        if (status.citizenStatus === 'SAFE' || status.status === 'RESOLVED') {
           localStorage.removeItem(ACTIVE_SOS_KEY);
           return null;
         }
-        localStorage.setItem(ACTIVE_SOS_KEY, JSON.stringify(updatedSos));
-        return updatedSos;
+        const next = { ...prev, ...status };
+        localStorage.setItem(ACTIVE_SOS_KEY, JSON.stringify(next));
+        return next;
       });
     };
 
     socket.on('state:updated', handleStateUpdate);
-    socket.on('sos:updated', handleSosUpdated);
+    socket.on('sos:status', handleSosStatus);
     return () => {
       socket.off('state:updated', handleStateUpdate);
-      socket.off('sos:updated', handleSosUpdated);
+      socket.off('sos:status', handleSosStatus);
     };
   }, [selectedZoneId, customCoord, loadEvacuationPlan]);
+
+  // Join the private room of our own SOS (proved with its access token);
+  // re-join after every reconnect because rooms do not survive disconnects.
+  const watchedSosId = activeSos?.id;
+  const watchedSosToken = activeSos?.accessToken;
+  useEffect(() => {
+    if (!watchedSosId || !watchedSosToken) return undefined;
+    const watch = () =>
+      socket.emit('citizen:watch', { sosId: watchedSosId, accessToken: watchedSosToken });
+    if (socket.connected) watch();
+    socket.on('connect', watch);
+    return () => socket.off('connect', watch);
+  }, [watchedSosId, watchedSosToken]);
 
   const handleCategoryChange = (nextCategory) => {
     setCitizenCategory(nextCategory);
@@ -212,9 +234,10 @@ export function CitizenPage() {
         lng: origin?.lng,
         notes,
       });
-      setActiveSos(result.sos);
+      const ownSos = { ...result.sos, accessToken: result.accessToken };
+      setActiveSos(ownSos);
       setLastSafeConfirmedAt(null);
-      localStorage.setItem(ACTIVE_SOS_KEY, JSON.stringify(result.sos));
+      localStorage.setItem(ACTIVE_SOS_KEY, JSON.stringify(ownSos));
       const hazardLabel = t(`hazards.${hazardType}`);
       toast.error(
         effectiveCategory === 'SPECIAL_CARE'
@@ -231,7 +254,16 @@ export function CitizenPage() {
   const handleMarkSafe = async (sosId) => {
     setIsSubmitting(true);
     try {
-      await crisisApi.markSafe(sosId ? { sosId } : { citizenCode });
+      const payload =
+        sosId && activeSos?.id === sosId
+          ? { sosId, accessToken: activeSos.accessToken }
+          : {
+              citizenCode,
+              zoneId: plan?.selectedZone?.id || selectedZoneId || undefined,
+              lat: plan?.origin?.lat,
+              lng: plan?.origin?.lng,
+            };
+      await crisisApi.markSafe(payload);
       setActiveSos(null);
       localStorage.removeItem(ACTIVE_SOS_KEY);
       setLastSafeConfirmedAt(new Date().toISOString());
