@@ -97,14 +97,14 @@ export function DispatcherLoginCard({ onLoginSuccess, loginFn }) {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-red-600/25 transition hover:bg-red-500 disabled:opacity-50"
+            className="flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-500 disabled:opacity-50"
           >
             <ShieldCheck className="h-4 w-4" />
             <span>{isSubmitting ? t('loginChecking') : t('loginSubmit')}</span>
           </button>
         </form>
 
-        <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5 text-[11px] text-slate-400">
+        <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5 text-xs text-slate-400">
           {t('loginSecurityNote')}
         </div>
       </div>

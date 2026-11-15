@@ -34,16 +34,16 @@ export function RedAlertBanner({ alerts = [], onExecute, onDismiss, isBusy }) {
         return (
           <div
             key={alert.id}
-            className="rounded-2xl border-2 border-red-500 bg-gradient-to-r from-red-950/90 via-rose-950/85 to-red-950/90 p-4 shadow-xl shadow-red-950/50"
+            className="rounded-2xl border-2 border-red-500 bg-red-950/80 p-4"
           >
             <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
               <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white shadow-lg sos-pulse-dot">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white sos-pulse-dot">
                   <Siren className="h-6 w-6" />
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white">
+                    <span className="rounded-md bg-red-600 px-2 py-0.5 text-xs font-extrabold uppercase tracking-wider text-white">
                       {t('redAlertTag')}
                     </span>
                     <span className="text-xs font-semibold text-red-200">
@@ -62,7 +62,7 @@ export function RedAlertBanner({ alerts = [], onExecute, onDismiss, isBusy }) {
                   type="button"
                   disabled={isBusy}
                   onClick={() => onExecute(alert.id)}
-                  className="flex min-h-[46px] items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-extrabold text-red-700 shadow-lg transition hover:bg-emerald-400 hover:text-slate-950 active:scale-[0.98] disabled:opacity-50"
+                  className="flex min-h-[46px] items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-extrabold text-red-700 transition hover:bg-emerald-400 hover:text-slate-950 active:scale-[0.98] disabled:opacity-50"
                 >
                   <CheckCircle2 className="h-5 w-5" />
                   <span>{t('redAlertExecuteBtn')}</span>
@@ -73,6 +73,7 @@ export function RedAlertBanner({ alerts = [], onExecute, onDismiss, isBusy }) {
                   disabled={isBusy}
                   onClick={() => onDismiss(alert.id)}
                   title={t('closeBtn')}
+                  aria-label={t('closeBtn')}
                   className="flex h-[46px] w-[46px] items-center justify-center rounded-xl border border-red-400/40 bg-red-900/50 text-red-200 transition hover:bg-red-800/70"
                 >
                   <X className="h-4 w-4" />
@@ -100,7 +101,7 @@ export function RedAlertBanner({ alerts = [], onExecute, onDismiss, isBusy }) {
               })}
             </span>
           </div>
-          <span className="text-[11px] text-emerald-300/80">
+          <span className="text-xs text-emerald-300/80">
             {formatTimeAgo(item.executedAt, lang)}
           </span>
         </div>

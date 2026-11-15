@@ -54,12 +54,12 @@ export function ShelterRoadControl({
                 <div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="font-bold text-white">{point.name}</span>
-                    <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
+                    <span className="rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300">
                       {t(`pointTypes.${point.type}`)}
                     </span>
                     <span
                       className={cn(
-                        'rounded px-1.5 py-0.5 text-[10px] font-bold',
+                        'rounded px-1.5 py-0.5 text-xs font-bold',
                         point.status === 'OPEN'
                           ? 'bg-emerald-500/20 text-emerald-300'
                           : point.status === 'STANDBY'
@@ -71,7 +71,7 @@ export function ShelterRoadControl({
                     </span>
                     <span
                       className={cn(
-                        'rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                        'rounded px-1.5 py-0.5 text-xs font-semibold',
                         point.isWheelchairAccessible === false
                           ? 'bg-fuchsia-500/20 text-fuchsia-300'
                           : 'bg-cyan-500/15 text-cyan-300'
@@ -82,7 +82,7 @@ export function ShelterRoadControl({
                         : t('accessibleTag')}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-[11px] text-slate-400">
+                  <p className="mt-0.5 text-xs text-slate-400">
                     {point.zone?.name} • {point.currentOccupancy}/{point.capacity}{' '}
                     {t('peopleUnit')}
                   </p>
@@ -121,7 +121,7 @@ export function ShelterRoadControl({
                     type="button"
                     disabled={isBusy}
                     onClick={() => onUpdateOccupancy(point.id, { status: 'OPEN' })}
-                    className="rounded-lg bg-emerald-600/30 px-2.5 py-1 text-[10px] font-bold text-emerald-200 hover:bg-emerald-600/45"
+                    className="rounded-lg bg-emerald-600/30 px-2.5 py-1 text-xs font-bold text-emerald-200 hover:bg-emerald-600/45"
                   >
                     {t('openPointBtn')}
                   </button>
@@ -133,7 +133,7 @@ export function ShelterRoadControl({
                       onClick={() =>
                         onUpdateOccupancy(point.id, { occupancyPercent: 40, status: 'OPEN' })
                       }
-                      className="rounded-lg bg-slate-800 px-2 py-1 text-[10px] font-semibold text-slate-300 hover:bg-slate-700"
+                      className="rounded-lg bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300 hover:bg-slate-700"
                     >
                       40%
                     </button>
@@ -143,7 +143,7 @@ export function ShelterRoadControl({
                       onClick={() =>
                         onUpdateOccupancy(point.id, { occupancyPercent: 92, status: 'OPEN' })
                       }
-                      className="rounded-lg bg-amber-500/20 px-2 py-1 text-[10px] font-semibold text-amber-300 hover:bg-amber-500/30"
+                      className="rounded-lg bg-amber-500/20 px-2 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/30"
                     >
                       92% (Reroute)
                     </button>
@@ -153,7 +153,7 @@ export function ShelterRoadControl({
                       onClick={() =>
                         onUpdateOccupancy(point.id, { occupancyPercent: 97, status: 'OPEN' })
                       }
-                      className="rounded-lg bg-red-500/25 px-2 py-1 text-[10px] font-bold text-red-200 hover:bg-red-500/35"
+                      className="rounded-lg bg-red-500/25 px-2 py-1 text-xs font-bold text-red-200 hover:bg-red-500/35"
                     >
                       {lang === 'en' ? '97% (Red Alert)' : '97% (Qırmızı Həyəcan)'}
                     </button>
@@ -174,12 +174,12 @@ export function ShelterRoadControl({
                 <div className="flex flex-wrap items-center gap-1.5 font-bold text-white">
                   <span>{road.name}</span>
                   {road.isWheelchairAccessible === false && (
-                    <span className="rounded bg-fuchsia-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-fuchsia-300">
+                    <span className="rounded bg-fuchsia-500/20 px-1.5 py-0.5 text-xs font-semibold text-fuchsia-300">
                       {t('inaccessibleTag')}
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-xs text-slate-400">
                   {road.zone?.name} • {road.distanceMeters} m •{' '}
                   <span
                     className={cn(
@@ -204,7 +204,7 @@ export function ShelterRoadControl({
                     disabled={isBusy || road.status === st}
                     onClick={() => onUpdateRoadStatus(road.id, { status: st })}
                     className={cn(
-                      'rounded-lg px-2 py-1 text-[10px] font-bold transition disabled:opacity-45',
+                      'rounded-lg px-2 py-1 text-xs font-bold transition disabled:opacity-45',
                       road.status === st
                         ? 'bg-slate-700 text-white'
                         : st === 'CLOSED'

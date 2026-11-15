@@ -28,9 +28,10 @@ Fövqəladə hallar zamanı əsas iki problem mövcuddur:
 | **React 18 + Vite + Tailwind CSS** | Frontend UI | Sürətli komponent yığımı, mobilə uyğun (`mobile-first`) yüksək kontrastlı fövqəladə idarəetmə interfeysi. |
 | **Leaflet (`react-leaflet`)** | İnteraktiv Xəritə | Ödənişli API açarlarından asılı olmadan OpenStreetMap üzərində polixətlər, radius dairələri və canlı markerlərin çəkilməsi. |
 | **Node.js 24 + Express** | Backend API | Asinxron I/O performansı, müasir ESM dəstəyi və yüngül servis arxitekturası. |
-| **Prisma ORM + PostgreSQL 16** | Verilənlər Bazası Qatı | Tip-təhlükəsiz sxem idarəetməsi, əlaqəli cədvəllər (`Zone`, `RoadNode`, `RoadSegment`, `AssemblyPoint`, `SosSignal`, `RescueBrigade`, `CriticalAlert`), atomik `$transaction` və Challenge Drop zamanı sürətli sxem yenilənməsi. |
+| **Prisma ORM + PostgreSQL 16** | Verilənlər Bazası Qatı | Tip-təhlükəsiz sxem idarəetməsi, əlaqəli cədvəllər (`Zone`, `RoadNode`, `RoadSegment`, `AssemblyPoint`, `SosSignal`, `SafetyCheckIn`, `RescueBrigade`, `CriticalAlert`, `Dispatcher`), atomik `$transaction` və Challenge Drop zamanı sürətli sxem yenilənməsi. |
 | **Socket.IO** | Real-Time Kommunikasiya | Yol bağlanması, yeni SOS və Qırmızı Həyəcan hadisələrinin millisaniyələr içində bütün Vətəndaş və Dispetçer ekranlarına çatdırılması. |
-| **Vitest + Supertest** | Avtomatlaşdırılmış Testlər | Alqoritm hədlərinin (500m, 90%, 95%) və HTTP validasiyasının sürətli avtomatik yoxlanışı. |
+| **Vitest + Supertest + Testing Library** | Avtomatlaşdırılmış Testlər | 62 unit + 36 inteqrasiya (real PostgreSQL, HTTP, Socket.IO) + 19 frontend testi; backend coverage 91.6% (CI-da minimum hədlər). Ətraflı: `TESTING.md`. |
+| **GitHub Actions** | CI | Hər push-da unit → inteqrasiya (Postgres servisi) → coverage → frontend test/build → Docker build. |
 | **Docker & Docker Compose** | Konteynerləşdirmə | PostgreSQL 16, Node.js 24 Backend və Nginx/React Frontend xidmətlərinin tək əmrlə tam təkrarlanabilən şəkildə işə salınması. |
 
 ---
@@ -38,25 +39,52 @@ Fövqəladə hallar zamanı əsas iki problem mövcuddur:
 ## 3. Təhlükəsizlik və Performans Tədbirləri
 
 ### Təhlükəsizlik:
-- **Dispetçer Autentifikasiyası və Səlahiyyət Nəzarəti:** Bütün dispetçer (`/api/dispatcher/*`), yol statusu dəyişikliyi (`PATCH /api/traffic/roads/:id/status`) və simulyasiya (`/api/simulation/*`) endpoint-ləri `requireDispatcherAuth` middleware-i ilə qorunur; icazəsiz sorğular `HTTP 401` ilə bloklanır.
-- **Kriptoqrafik Parol və JWT Qoruması:** Dispetçer parolları `crypto.scryptSync` (16 bayt təsadüfi salt + `timingSafeEqual`) ilə saxlanılır; sessiya `HttpOnly`, `SameSite=Lax` JWT (`HS256`) cookie-si üzərindən idarə olunur.
-- **Brute-Force Mühafizəsi & Audit İzi:** Giriş endpoint-ində uğursuz cəhdlər üzrə IP əsaslı məhdudlaşdırma (`HTTP 429`) tətbiq olunur və icra edilən Qırmızı Həyəcan qərarlarında operatorun ID/nişan kodu (`executedByDispatcherId`) saxlanılır.
-- **WebSocket Kanal Təcridi:** Yalnız etibarlı JWT ilə qoşulan dispetçer soketləri `dispatchers` otağına daxil edilir; vətəndaşların şəxsi SOS detalları ictimai kanala yayımlanmır.
-- **Giriş Validasiyası (`Zod`):** Bütün POST/PATCH sorğuları (`hazardType`, koordinat aralığı `-90..90`, doluluq faizi və s.) şema səviyyəsində yoxlanılır; yanlış məlumatlar `HTTP 400` ilə rədd edilir.
-- **SQL Injection Mühafizəsi:** Prisma ORM bütün sorğuları parametrləşdirilmiş şəkildə icra edir.
-- **HTTP Başlıq Təhlükəsizliyi (`helmet`) və CORS:** Server cavabları `helmet` təhlükəsizlik başlıqları və konfiqurasiya olunan `CORS` (`credentials: true`) siyasəti ilə qorunur.
-- **Tranzaksiya Bütövlüyü:** Qırmızı Həyəcan icrası (`executeCriticalAlert`) və briqada təyinatı `prisma.$transaction` daxilində atomik aparılır — eyni anda iki dispetçer klikləsə belə ikiqat briqada göndərilməsinin qarşısı alınır (idempotentlik).
-
-- **Xarici Asılılıqlara Qarşı Dayanıqlılıq:** Circuit Breaker + Fallback (bax: Challenge Drop #2), xarici API cavabının `zod` sxem yoxlaması, keşin yol vəziyyəti hash-i ilə etibarsızlaşdırılması (bağlanmış yoldan keçən köhnə marşrut verilmir).
+Tam təhdid modeli: `SECURITY.md`. Hər bənd avtomatlaşdırılmış testlə yoxlanılır.
+- **Dispetçer autentifikasiyası:** `/api/dispatcher/*`, yol statusu dəyişikliyi və `/api/simulation/*` `requireDispatcherAuth` ilə qorunur (`401 AUTH_REQUIRED`). Parollar `scrypt` + fərdi salt + `timingSafeEqual`. JWT (`HS256`, 8 saat) **yalnız** `HttpOnly`, `SameSite=Lax` cookie-də saxlanılır — login cavabının gövdəsində qaytarılmır.
+- **SOS sahibliyi (IDOR qorunması):** hər SOS üçün birdəfəlik təsadüfi `accessToken` (192 bit) verilir, bazada yalnız SHA-256 heşi saxlanılır və heç bir API cavabında görünmür (Prisma `omit`). "Təhlükəsizəm" və şəxsi Socket.IO kanalı yalnız bu tokenlə işləyir.
+- **Şəxsi məlumatların (PII) təcridi:** ad, telefon, dəqiq koordinat və qeydlər yalnız autentifikasiyalı `dispatchers` Socket.IO otağına göndərilir; vətəndaş yalnız öz SOS-unun PII-siz statusunu alır; ictimai kanalda yalnız ID və səbəb kodları var.
+- **Sui-istifadəyə qarşı limitlər:** dəqiqədə 10-dan çox SOS və 15 dəqiqədə 10 uğursuz giriş → `429 RATE_LIMITED` (`express-rate-limit`, nginx arxasında real IP üçün `trust proxy`). Qırmızı Həyəcan isə yalnız 4 **fərqli** vətəndaşın SOS-u ilə yaranır — bir cihaz saxta həyəcan yarada bilməz.
+- **CORS:** açıq allow-list (`FRONTEND_ORIGIN`); `*` qəbul edilmir, çünki `credentials: true` ilə istənilən sayta dispetçer adından sorğu imkanı verərdi.
+- **Giriş validasiyası (`zod`):** body, query və path parametrləri; yanlış dəyər `400 VALIDATION_ERROR`. Xarici marşrut API-sinin cavabı da sxemlə yoxlanılır. 500 xətalarında daxili mesaj gizlədilir.
+- **Eyni anda əməliyyatlar (race condition):** həyəcan yaradılması zona/məntəqə üzrə PostgreSQL advisory lock ilə, icra isə `SELECT … FOR UPDATE` ilə seriallaşdırılır; briqada və ehtiyat məntəqə şərti `updateMany` ilə atomik tutulur. Nəticə: iki dispetçer eyni anda kliklədikdə yalnız bir briqada göndərilir (inteqrasiya testi ilə sübut olunub).
+- **Audit izi:** icra və rədd edilən həyəcanlarda operatorun ID/nişan kodu və vaxtı saxlanılır.
+- **Konteynerlər:** backend root olmayan `node` istifadəçisi ilə işləyir, healthcheck-lər var, PostgreSQL portu yalnız `127.0.0.1`-ə açılır; `X-Powered-By` söndürülüb, `helmet` başlıqları aktivdir.
+- **Xarici asılılıqlara dayanıqlılıq:** Circuit Breaker + Fallback (Challenge Drop #2); keş yol vəziyyəti heşi ilə etibarsızlaşdırılır — bağlanmış yoldan keçən köhnə marşrut verilmir.
 
 ### Performans:
 - **Verilənlər Bazası İndeksləri:** `sos_signals(zone_id, created_at)`, `sos_signals(citizen_status, created_at)`, `road_segments(status)`, `critical_alerts(status, created_at)` üzrə kompozit indekslər 5 dəqiqəlik vaxt pəncərəsi sorğularını sürətləndirir.
 - **Yüngül Yaddaşdaxili Qraf Həllçisi:** Təxliyə marşrutları DB-dən paralel (`Promise.all`) çəkilən qovşaq və yollar üzərində millisaniyələr içində hesablanır.
-- **Real-Time Event Push:** Frontend davamlı polling etmir; yalnız `Socket.IO` hadisələri gəldikdə yenilənir.
+- **Real-Time Event Push:** Frontend polling etmir. Vətəndaş ekranı yalnız marşrutu dəyişə bilən 6 hadisə növündə (yol, doluluq, həyəcan icrası, marşrut rejimi, reset) və 400 ms debounce ilə yenilənir — başqa vətəndaşların SOS-ları minlərlə ekranda təkrar hesablama yaratmır.
+- **Circuit Breaker:** xarici API çökəndə istifadəçilər 5 saniyə gözləmir — circuit açıq olduqda cavab ~5 ms-də lokal ehtiyatdan verilir.
 
 ---
 
-## 4. Gələcək İnkişaf İmkanları
+## 4. Əsas Arxitektura Qərarları (ADR qısa)
+
+| Qərar | Alternativ | Səbəb |
+|---|---|---|
+| Yaddaşdaxili Dijkstra (DB-dən yüklənmiş qraf) | PostGIS / pgRouting | Prototip ölçüsündə (~20 qovşaq) millisaniyələr; quraşdırma tələb etmir. Böyük şəhər üçün PostGIS yolu açıqdır. |
+| Qərar məntiqi marşrut mənbəyindən ayrıdır (`rankEvacuationOptions`) | Hər yerdə birbaşa Dijkstra | Challenge Drop #2-də onlayn/oflayn rejimdə eyni 90%/bağlı yol/əlçatanlıq qaydaları — tək test olunan funksiya. |
+| Öz Circuit Breaker sinfimiz | `opossum` kitabxanası | ~150 sətir, sınaq saatı (fake clock) ilə tam test olunur, əlavə asılılıq yoxdur. |
+| Xarici marşrut API-si ayrıca konteynerdə | Prosesdaxili mock | Çöküş real şəbəkə xətasıdır (503, timeout, connection refused) — demo və testlər realdır. |
+| Socket.IO otaqları (`dispatchers`, `sos:<id>`) | Hamıya yayım | PII yalnız səlahiyyətli operatorlara çatır. |
+| JWT HttpOnly cookie-də | `localStorage` | XSS zamanı token oğurlana bilmir. |
+| Hədlər `config/constants.js`-də | Kodda səpələnmiş rəqəmlər | Yeni challenge drop-da həddin dəyişməsi bir sətirdir; testlər dəqiq dəyərləri yoxlayır. |
+
+---
+
+## 5. Məlum Məhdudiyyətlər (dürüst qiymətləndirmə)
+
+- Sxem `prisma db push` ilə tətbiq olunur; istehsal üçün `prisma migrate` tarixçəsi lazımdır.
+- Rate-limit və marşrut keşi proses yaddaşındadır — çox instansiyalı yerləşdirmədə Redis (və Socket.IO Redis adapter) lazımdır.
+- Yol seqmentlərinin həndəsəsi sadələşdirilib (qovşaqlar arası xətt); real küçə həndəsəsi OSRM ixracı ilə əlavə oluna bilər.
+- Simulyasiya olunmuş xarici API yol məlumatını eyni bazadan oxuyur (real provayder öz məlumatına malikdir).
+- `npm audit`: `zod` 3 (major yeniləmə tələb edir) və Prisma alətlərindəki `deepmerge-ts` — təsir və azaltma tədbirləri `TESTING.md`-də.
+- Brauzer e2e testləri (Playwright) vaxt səbəbindən əlavə olunmayıb; axınlar API + Socket.IO səviyyəsində test olunur.
+
+---
+
+## 6. Gələcək İnkişaf İmkanları
 
 1. **PostGIS İnteqrasiyası:** Böyük meqapolislər (yüz minlərlə qovşaq və milyonlarla aktiv vətəndaş) üçün `ST_DWithin` məkan indekslərinə keçid.
 2. **Real Yol-Nəqliyyat API-si (OSRM / Google Maps / Waze):** Şəhər kameraları və tıxac sensorlarından gələn canlı axınların `RoadSegment.status` dəyərlərinə avtomatik bağlanması.

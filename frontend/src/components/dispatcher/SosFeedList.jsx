@@ -23,7 +23,7 @@ export function SosFeedList({ zones = [], sosSignals = [], onDispatch, isBusy })
               >
                 <div>
                   <div className="font-bold text-white">{zone.name}</div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className="text-xs text-slate-400">
                     {t('zoneStatsLine', {
                       sos: zone.activeSosCount,
                       shelters: zone.openSheltersCount,
@@ -33,7 +33,7 @@ export function SosFeedList({ zones = [], sosSignals = [], onDispatch, isBusy })
                 </div>
                 <span
                   className={cn(
-                    'rounded-lg border px-2 py-0.5 text-[10px] font-bold',
+                    'rounded-lg border px-2 py-0.5 text-xs font-bold',
                     risk.cls
                   )}
                 >
@@ -78,7 +78,7 @@ export function SosFeedList({ zones = [], sosSignals = [], onDispatch, isBusy })
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     {isPriority && (
-                      <div className="mb-1.5 inline-flex items-center gap-1 rounded-md bg-fuchsia-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow">
+                      <div className="mb-1.5 inline-flex items-center gap-1 rounded-md bg-fuchsia-600 px-2 py-0.5 text-xs font-extrabold text-white shadow">
                         <Accessibility className="h-3 w-3" />
                         <span>{t('priorityBadge')}</span>
                       </div>
@@ -87,7 +87,7 @@ export function SosFeedList({ zones = [], sosSignals = [], onDispatch, isBusy })
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span
                         className={cn(
-                          'rounded-md border px-1.5 py-0.5 text-[10px] font-bold',
+                          'rounded-md border px-1.5 py-0.5 text-xs font-bold',
                           isSafe
                             ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
                             : hazard?.color
@@ -98,16 +98,16 @@ export function SosFeedList({ zones = [], sosSignals = [], onDispatch, isBusy })
                       <span className="font-bold text-white">
                         {sos.citizenName || sos.citizenCode}
                       </span>
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-xs text-slate-400">
                         • {sos.zone?.name}
                       </span>
                     </div>
 
                     {sos.notes && (
-                      <p className="mt-1 text-[11px] text-slate-300">{sos.notes}</p>
+                      <p className="mt-1 text-xs text-slate-300">{sos.notes}</p>
                     )}
 
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                       <span>{formatTimeAgo(sos.createdAt, lang)}</span>
                       {sos.assignedBrigade && (
                         <span className="font-semibold text-cyan-300">
@@ -122,7 +122,7 @@ export function SosFeedList({ zones = [], sosSignals = [], onDispatch, isBusy })
                       type="button"
                       disabled={isBusy}
                       onClick={() => onDispatch(sos.id)}
-                      className="flex shrink-0 items-center gap-1 rounded-lg bg-cyan-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-cyan-500 disabled:opacity-50"
+                      className="flex shrink-0 items-center gap-1 rounded-lg bg-cyan-600 px-2.5 py-1.5 text-xs font-bold text-white transition hover:bg-cyan-500 disabled:opacity-50"
                     >
                       <Send className="h-3 w-3" />
                       <span>{t('dispatchBrigadeBtn')}</span>

@@ -55,6 +55,16 @@ Bu sənəd **"Urban Crisis & Crowd Evacuation Engine"** hakaton layihəsinin haz
 - **AI-nin rolu:** Xarici marşrut API-sinin ayrı konteynerdə simulyasiyası (503 / >5 s), asılılıqsız Circuit Breaker, keş + lokal qraf + koordinat matrisi ehtiyat zənciri, vətəndaş "Oflayn / Ehtiyat marşrut rejimi" paneli və dispetçer idarəetmə düymələri.
 - **İnsan nəzarəti və yoxlama:** 5 saniyəlik hədd testdə real ölçüldü (5.03 s-də kəsilmə), `docker compose stop routing-api` ilə real çöküş yoxlandı (bütün sorğular `HTTP 200`, circuit açıq olduqda ~5 ms), avtomatik bərpa health probe ilə təsdiqləndi. Keşin bağlanmış yoldan keçən köhnə marşrut verə bilməməsi üçün açara yol vəziyyəti hash-i əlavə edilməsi qərarı qəbul edildi.
 
+### Mərhələ 9: Təhlükəsizlik, Testlər, UI/UX və Sənədləşmə (Claude Code)
+- **AI-nin rolu:** `express-rate-limit` (SOS və uğursuz giriş), JWT-nin cavab gövdəsindən çıxarılması, Docker sərtləşdirmə (root olmayan istifadəçi, healthcheck), sərhəd-dəyər testləri (500 m / 501 m, 90%, 95.0% / 95.2%), demo ssenari testləri, coverage hədləri, GitHub Actions CI, vətəndaş ekranının "əvvəl cavab" düzümü və mobil SOS paneli, `TESTING.md`, `SECURITY.md`, `DEMO_SCRIPT.md`.
+- **İnsan nəzarəti və yoxlama:** Komanda vaxt məhdudiyyətinə görə brauzer e2e testlərini əhatədən çıxardı. `npm audit fix` Prisma CLI-ni klientdən fərqli versiyaya endirdikdə bu aşkarlanıb geri qaytarıldı; qalan iki tövsiyə (zod 4, deepmerge-ts) major yeniləmə tələb etdiyi üçün sənədləşdirildi. Sənədlərdəki hər iddia koda qarşı yoxlanıldı (məs. "5 s timeout" iddiası üçün ayrıca test əlavə edildi).
+
+### AI istifadəsində nəzarət prinsiplərimiz
+1. **Test-first:** AI-nin hər xəta düzəlişi əvvəlcə uğursuz test, sonra kod ilə edildi.
+2. **Real mühitdə yoxlama:** kritik iddialar (race condition, 5 s timeout, provayder çöküşü) real PostgreSQL, real HTTP və brauzerdə ölçüldü.
+3. **Təhlükəli əməliyyatlara icazə yoxdur:** verilənləri silən əmrlər (məs. `prisma db push --force-reset`) AI tərəfindən icra edilmədi.
+4. **Commit və push qərarları komandaya məxsusdur.**
+
 ---
 
 ## 3. Məsuliyyət Bəyannaməsi

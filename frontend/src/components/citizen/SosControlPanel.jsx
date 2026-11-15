@@ -44,14 +44,14 @@ export function SosControlPanel({
   };
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg">
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-red-400" />
           <h2 className="text-sm font-bold text-white">{t('sosPanelTitle')}</h2>
         </div>
         {isSpecialCare && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-[10px] font-bold text-fuchsia-300 ring-1 ring-fuchsia-500/40">
+          <span className="inline-flex items-center gap-1 rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-xs font-bold text-fuchsia-300 ring-1 ring-fuchsia-500/40">
             <Accessibility className="h-3 w-3" />
             {t('priorityBadge')}
           </span>
@@ -76,7 +76,7 @@ export function SosControlPanel({
                 </span>
                 {(activeSos.priorityLevel === 1 ||
                   activeSos.citizenCategory === 'SPECIAL_CARE') && (
-                  <span className="rounded bg-fuchsia-600/80 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+                  <span className="rounded bg-fuchsia-600/80 px-1.5 py-0.5 text-xs font-extrabold text-white">
                     {t('priorityBadge')}
                   </span>
                 )}
@@ -99,7 +99,7 @@ export function SosControlPanel({
             type="button"
             disabled={isSubmitting}
             onClick={() => onMarkSafe(activeSos.id)}
-            className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-500 disabled:opacity-50"
+            className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50"
           >
             <ShieldCheck className="h-5 w-5" />
             <span>{t('markSafeBtn')}</span>
@@ -131,7 +131,7 @@ export function SosControlPanel({
         />
       </div>
 
-      <p className="mb-2 text-[11px] font-medium text-slate-400">{t('sosInstruction')}</p>
+      <p className="mb-2 text-xs font-medium text-slate-400">{t('sosInstruction')}</p>
 
       <div className="grid grid-cols-2 gap-2">
         {HAZARD_TYPES.map((hazard) => {

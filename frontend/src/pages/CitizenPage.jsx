@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { CitizenRoleSelector } from '../components/citizen/CitizenRoleSelector';
+import { CitizenStatusHero } from '../components/citizen/CitizenStatusHero';
+import { MobileActionBar } from '../components/citizen/MobileActionBar';
 import { EvacuationRouteCard } from '../components/citizen/EvacuationRouteCard';
 import { RoutingModeBanner } from '../components/citizen/RoutingModeBanner';
 import { SosControlPanel } from '../components/citizen/SosControlPanel';
@@ -307,35 +309,53 @@ export function CitizenPage() {
     }
   };
 
+  const scrollToId = (id) =>
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
   return (
-    <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-4 p-4 lg:grid-cols-12">
+    <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-4 p-4 pb-28 lg:grid-cols-12 lg:pb-4">
       <div className="space-y-4 lg:col-span-5 xl:col-span-4">
         <RoutingModeBanner routing={plan?.routing} />
 
-        <CitizenRoleSelector
-          citizenCategory={citizenCategory}
-          onChange={handleCategoryChange}
+        {/* 1. Where to go — the answer first */}
+        <CitizenStatusHero
+          plan={plan}
+          isLoading={isLoadingPlan}
+          onShowMap={() => scrollToId('citizen-map')}
         />
 
+        {/* 2. Help — one click away */}
+        <div id="sos-panel" className="scroll-mt-24">
+          <SosControlPanel
+            activeSos={activeSos}
+            lastSafeConfirmedAt={lastSafeConfirmedAt}
+            citizenCategory={citizenCategory}
+            isSubmitting={isSubmitting}
+            onSendSos={handleSendSos}
+            onMarkSafe={handleMarkSafe}
+          />
+        </div>
+
+        {/* 3. Setup — location and profile */}
         <ZoneCoordinateSelector
           zones={zones}
           selectedZoneId={plan?.selectedZone?.id || selectedZoneId}
           origin={plan?.origin}
           pickMode={pickMode}
           onSelectZone={handleSelectZone}
-          onTogglePickMode={() => setPickMode((prev) => !prev)}
+          onTogglePickMode={() => {
+            setPickMode((prev) => !prev);
+            scrollToId('citizen-map');
+          }}
           onUseGps={handleUseGps}
         />
 
-        <SosControlPanel
-          activeSos={activeSos}
-          lastSafeConfirmedAt={lastSafeConfirmedAt}
+        <CitizenRoleSelector
           citizenCategory={citizenCategory}
-          isSubmitting={isSubmitting}
-          onSendSos={handleSendSos}
-          onMarkSafe={handleMarkSafe}
+          onChange={handleCategoryChange}
         />
 
+        {/* 4. Details — why this route, all nearby points */}
         <EvacuationRouteCard
           plan={plan}
           isLoading={isLoadingPlan}
@@ -350,7 +370,10 @@ export function CitizenPage() {
         />
       </div>
 
-      <div className="h-[520px] lg:sticky lg:top-20 lg:col-span-7 lg:h-[calc(100dvh-7rem)] xl:col-span-8">
+      <div
+        id="citizen-map"
+        className="h-[70dvh] scroll-mt-24 lg:sticky lg:top-20 lg:col-span-7 lg:h-[calc(100dvh-7rem)] xl:col-span-8"
+      >
         <CrisisMap
           mode="citizen"
           accessibleOnly={citizenCategory === 'SPECIAL_CARE'}
@@ -365,6 +388,11 @@ export function CitizenPage() {
           sosSignals={activeSos ? [activeSos] : []}
         />
       </div>
+
+      <MobileActionBar
+        onSos={() => scrollToId('sos-panel')}
+        onRoute={() => scrollToId('citizen-map')}
+      />
     </div>
   );
 }

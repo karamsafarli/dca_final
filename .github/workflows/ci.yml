@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend — unit + integration (PostgreSQL) + coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: crisis_user
+          POSTGRES_PASSWORD: crisis_pass
+          POSTGRES_DB: urban_crisis_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U crisis_user -d urban_crisis_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://crisis_user:crisis_pass@localhost:5432/urban_crisis_test?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Unit tests
+        run: npm test
+      - name: Unit + integration tests with coverage (thresholds enforced)
+        run: npm run test:coverage
+      # Report-only: the two open advisories (zod < 4, Prisma's deepmerge-ts)
+      # need major-version upgrades; see TESTING.md "Known advisories".
+      - name: Dependency audit (production deps, report only)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage
+
+  frontend:
+    name: Frontend — tests + production build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Component, i18n and API-layer tests
+        run: npm run test:coverage
+      - name: Production build
+        run: npm run build
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose build

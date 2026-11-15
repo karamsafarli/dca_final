@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/db.js';
 import { requireDispatcherAuth } from '../middleware/authMiddleware.js';
+import { createSosLimiter } from '../middleware/rateLimits.js';
 import { updateRoadStatus } from '../services/dispatcherService.js';
 import { getEvacuationPlan } from '../services/evacuationService.js';
 import { createSosSignal, markCitizenSafe } from '../services/sosService.js';
@@ -85,6 +86,7 @@ router.get(
 
 router.post(
   '/citizen/sos',
+  createSosLimiter(),
   validateBody(createSosSchema),
   asyncHandler(async (req, res) => {
     const io = req.app.get('io');

@@ -69,7 +69,7 @@ export function CrisisMap({
   return (
     <div className="relative h-full min-h-[420px] w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
       {pickMode && (
-        <div className="pointer-events-none absolute left-1/2 top-3 z-[500] -translate-x-1/2 rounded-full bg-blue-600/95 px-4 py-1.5 text-xs font-semibold text-white shadow-lg ring-1 ring-blue-300/40">
+        <div className="pointer-events-none absolute left-1/2 top-3 z-[500] -translate-x-1/2 rounded-full bg-blue-600/95 px-4 py-1.5 text-xs font-semibold text-white ring-1 ring-blue-300/40">
           {t('mapPickBanner')}
         </div>
       )}
@@ -246,7 +246,7 @@ export function CrisisMap({
                         {point.route.estimatedMinutes} {t('popupMin')})
                       </div>
                     )}
-                    <div className="text-[11px] text-slate-400">{point.address}</div>
+                    <div className="text-xs text-slate-400">{point.address}</div>
                   </div>
                 </Popup>
               </CircleMarker>
@@ -350,7 +350,7 @@ export function CrisisMap({
       </MapContainer>
 
       {/* Map Legend */}
-      <div className="pointer-events-auto absolute bottom-3 left-3 z-[450] flex flex-wrap gap-2 rounded-xl border border-slate-700/80 bg-slate-950/90 px-3 py-2 text-[11px] text-slate-200 backdrop-blur">
+      <div className="pointer-events-auto absolute bottom-3 left-3 z-[450] flex flex-wrap gap-2 rounded-xl border border-slate-700/80 bg-slate-950/90 px-3 py-2 text-xs text-slate-200 backdrop-blur">
         {origin && (
           <span className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white" />

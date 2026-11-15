@@ -2,6 +2,28 @@
 
 Fövqəladə hallar (zəlzələ, güclü sel, yanğın, sənaye qəzaları və kütləvi tədbirlər) zamanı vətəndaşların ən yaxın təhlükəsiz toplanış məntəqələrinə dinamik yönləndirilməsi və dispetçer mərkəzinin böhran koordinasiyası üçün hazırlanmış real-vaxt mikro-sistem.
 
+![CI](https://github.com/karamsafarli/dca_final/actions/workflows/ci.yml/badge.svg)
+
+**Sənədlər:** [Texniki izah](TECHNICAL_DOC.md) ([.docx](docs/TECHNICAL_DOC.docx)) · [Testlər](TESTING.md) · [Təhlükəsizlik](SECURITY.md) · [Challenge Drop-lar](docs/CHALLENGE_DROPS.md) · [Demo ssenarisi](DEMO_SCRIPT.md) · [AI bəyannaməsi](AI_DECLARATION.md)
+
+> **English summary.** A real-time micro-system for urban evacuations. **Citizens** get the nearest safe assembly point with live occupancy and a route that automatically avoids closed roads and points ≥ 90 % full, send a one-click SOS and confirm "I am safe". **Dispatchers** see SOS signals, occupancy and rescue brigades live; the **critical crisis algorithm** raises a Red Alert when ≥ 4 *distinct* citizens send SOS within 500 m / the same zone in 5 minutes, or a point exceeds 95 %, and executes the response (brigade + reserve point) in one click, race-safe. **Challenge Drop #1:** Priority #1 SOS and step-free routes for mobility-impaired citizens, full AZ/EN UI. **Challenge Drop #2:** when the external routing API returns 503 or takes > 5 s, a circuit breaker switches to cached routes / the local road graph and shows an "offline / backup route mode" notice. Stack: React + Leaflet, Node.js + Express + Socket.IO, Prisma + PostgreSQL, Docker Compose. 117 automated tests, 91.6 % backend coverage, CI on every push.
+
+### Tələb → İmplementasiya → Test
+
+| Tələb (`task.txt`) | Harada | Test |
+|---|---|---|
+| Rayon/koordinat üzrə ən yaxın məntəqələr, doluluq %, marşrut | `evacuationService.js`, `routingService.js`, `CitizenStatusHero.jsx` | `unit/crisisAndRouting`, `integration/routingResilience` |
+| Yol bağlananda avtomatik alternativ marşrut | `rankEvacuationOptions`, Socket.IO `state:updated` | `integration/simulation` (road-toggle) |
+| Məntəqə **90%** olduqda alternativ marşrut | `REROUTE_OCCUPANCY_PERCENT` | `unit/thresholds` (89.9% / 90%) |
+| 1 kliklə SOS (4 növ) + "Təhlükəsizəm" | `sosService.js`, `SosControlPanel.jsx` | `integration/citizenSafety` |
+| Canlı dispetçer paneli | `dispatcherService.js`, `DispatcherPage.jsx`, Socket.IO otaqları | `integration/realtime` |
+| **4 fərqli** SOS / **500 m** və ya zona / **5 dəq** → Qırmızı Həyəcan | `crisisEngineService.js` | `unit/thresholds` (500/501 m), `unit/crisisRules`, `integration/crisisEngine` |
+| Doluluq **> 95%** → Qırmızı Həyəcan | `evaluateCapacityCrisis` | `unit/thresholds` (95.0/95.2%), `integration/crisisEngine` |
+| Qərarın 1 kliklə icrası (briqada + yeni məntəqə) | `executeCriticalAlert` (row lock) | `integration/crisisEngine` (eyni anda 2 klik → 1 briqada) |
+| **Drop #1:** Prioritet #1 SOS + maneəsiz marşrut | `SPECIAL_CARE`, `accessibleOnly`, MEDICAL briqada üstünlüyü | `unit/crisisAndRouting`, `EvacuationRouteCard.test` |
+| **Drop #1:** AZ / EN dinamik i18n | `I18nContext`, xəta kodlarının tərcüməsi | `translations.test`, `api.test`, `RedAlertBanner.test` |
+| **Drop #2:** API 503 / > 5 s → Circuit Breaker + Fallback + "Oflayn" bildirişi | `circuitBreaker.js`, `routingGateway.js`, `RoutingModeBanner.jsx` | `unit/circuitBreaker`, `unit/routingGateway`, `integration/routingResilience` |
+
 ---
 
 ## 1. Sistem Arxitekturası və Məlumat Axını (Architecture & Data Flow)
@@ -123,6 +145,8 @@ Brauzerdə açın: http://localhost:5173 (Vite proksisi `/api` və `/socket.io`-
 
 ## 3. Testlərin İcra Olunması (Testing)
 
+> Tam test strategiyası, tələb → test izləmə matrisi və coverage: **[TESTING.md](TESTING.md)**. CI: `.github/workflows/ci.yml` (unit + PostgreSQL inteqrasiya + coverage hədləri + frontend + Docker build).
+
 | Paket | Əmr | Nə yoxlanılır |
 |---|---|---|
 | Backend unit | `cd backend && npm test` | Dijkstra/rerouting, 90%/95% hədləri, 4 **fərqli** vətəndaş qaydası, klaster pəncərəsi, briqada seçimi, CORS, auth, validasiya |
@@ -162,7 +186,12 @@ Dispetçer panelinə (`/dispatcher`), yol bağlama əməliyyatlarına və simuly
 
 - **Şifrə Təhlükəsizliyi:** Parollar `node:crypto` (`scrypt` + fərdi random salt + `timingSafeEqual`) ilə heşlənir.
 - **Sessiya İdarəetməsi:** `POST /api/auth/login` uğurlu olduqda `HS256` JWT token yaradılır və **HttpOnly / SameSite=Lax** cookie (`crisis_dispatcher_token`) olaraq təyin edilir (API testləri üçün `Authorization: Bearer <token>` də dəstəklənir).
-- **Brute-Force Mühafizəsi:** Eyni IP-dən 15 dəqiqədə 10 uğursuz giriş cəhdi olduqda `HTTP 429` qaytarılır.
+- **Brute-Force və Spam Mühafizəsi (`express-rate-limit`):** eyni IP-dən 15 dəqiqədə 10 **uğursuz** giriş cəhdi və dəqiqədə 10-dan çox SOS sorğusu `HTTP 429 RATE_LIMITED` ilə rədd edilir (`trust proxy` ilə nginx arxasında real müştəri IP-si istifadə olunur).
+- **Token yalnız cookie-də:** JWT login cavabının gövdəsində qaytarılmır, yalnız `HttpOnly` cookie-də saxlanılır.
+- **SOS sahibliyi:** hər SOS üçün birdəfəlik `accessToken` (DB-də yalnız SHA-256 heşi); "Təhlükəsizəm" yalnız bu tokenlə mümkündür.
+- **PII izolyasiyası:** tam SOS məlumatı yalnız `dispatchers` Socket.IO otağına göndərilir; vətəndaş yalnız öz SOS-unun statusunu alır.
+- **CORS allow-list:** `FRONTEND_ORIGIN` siyahısı; `*` qəbul edilmir.
+- **Konteynerlər:** backend `node` (root olmayan) istifadəçi ilə işləyir, healthcheck-lər var, PostgreSQL portu yalnız `127.0.0.1`-ə bağlanır. Demo dəyərlərini dəyişmək üçün `.env.example` → `.env`.
 - **WebSocket İcazəsi:** Yalnız etibarlı dispetçer JWT-sinə sahib Socket.IO bağlantıları `dispatchers` otağına qoşulur və canlı SOS / Qırmızı Həyəcan hadisələrini qəbul edir.
 
 ### İlkin Dispetçer Hesabları (Seeded)
@@ -181,7 +210,7 @@ Sistemə sonradan əlavə edilən tələblər əsasında iki kritik funksional q
 
 1. **Hərəkət Məhdudiyyətli Şəxs / Xüsusi Qayğı (`SPECIAL_CARE`) Rolu və Prioritet #1 SOS:**
    - Vətəndaş interfeysində `Standart Vətəndaş` və `Hərəkət Məhdudiyyətli / Xüsusi Qayğı` profili seçilə bilir.
-   - `SPECIAL_CARE` rejimində göndərilən SOS müraciətləri bazada avtomatik `priorityLevel = 1` (**Kritik Prioritet / Priority #1**) statusu alır və Dispetçer panelində axının ən yuxarısında sabitləşdirilərək ani səs/vizual xəbərdarlıq yaradır.
+   - `SPECIAL_CARE` rejimində göndərilən SOS müraciətləri bazada avtomatik `priorityLevel = 1` (**Kritik Prioritet / Priority #1**) statusu alır və Dispetçer panelində axının ən yuxarısında sabitləşdirilərək ani vizual xəbərdarlıq (toast) yaradır.
    - Marşrutlaşdırma mühərriki (`routingService.js` + `evacuationService.js`) `accessibleOnly=true` rejimində pilləkənli/pandussuz yol seqmentlərini (`isWheelchairAccessible = false`) və yeraltı/əlçatmaz sığınacaqları avtomatik kənarlaşdıraraq **yalnız əlil arabası və tibbi nəqliyyat üçün uyğun (panduslu, maneəsiz)** marşrut və toplanış məntəqəsi təyin edir.
 2. **Dinamik İkidilli İnterfeys (`AZ` / `EN` i18n):**
    - Naviqasiya panelində yerləşən `AZ | EN` keçidi vasitəsilə bütün Vətəndaş, Dispetçer, Giriş, Xəritə legendaları, bildirişlər (`toast`) və status etiketləri səhifəni yeniləmədən real vaxtda Azərbaycan və İngilis dilləri arasında dəyişdirilir.

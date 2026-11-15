@@ -14,7 +14,8 @@
     "test:integration": "vitest run --config vitest.integration.config.js",
     "test:all": "npm test && npm run test:integration",
     "routing-api": "node src/external/routingApiServer.js",
-    "routing-api:dev": "node --watch src/external/routingApiServer.js"
+    "routing-api:dev": "node --watch src/external/routingApiServer.js",
+    "test:coverage": "VITEST_ALL=1 vitest run --config vitest.integration.config.js --coverage"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
@@ -22,6 +23,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
@@ -29,7 +31,8 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "prisma": "^6.6.0",
+    "@vitest/coverage-v8": "^3.2.7",
+    "prisma": "^6.19.3",
     "socket.io-client": "^4.8.1",
     "supertest": "^7.0.0",
     "vitest": "^3.0.9"

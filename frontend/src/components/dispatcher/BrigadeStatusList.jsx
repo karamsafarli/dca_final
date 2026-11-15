@@ -22,14 +22,14 @@ export function BrigadeStatusList({ rescueBrigades = [] }) {
           >
             <div>
               <div className="font-bold text-white">{brg.name}</div>
-              <div className="text-[11px] text-slate-400">
+              <div className="text-xs text-slate-400">
                 {brg.zone?.name} • {t(`brigadeTypes.${brg.unitType}`)}
               </div>
             </div>
 
             <span
               className={cn(
-                'shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-bold',
+                'shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold',
                 brg.status === 'DISPATCHED'
                   ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
                   : brg.status === 'AVAILABLE'

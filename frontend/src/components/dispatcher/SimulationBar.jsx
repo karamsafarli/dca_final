@@ -1,10 +1,30 @@
 import { Flame, Gauge, RotateCcw, RouteOff, Timer, Wifi, WifiOff, Zap } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { useI18n } from '../../i18n/I18nContext';
 
 export function SimulationBar({ zones = [], assemblyPoints = [], routing, onRunAction, isBusy }) {
   const { t } = useI18n();
   const [selectedZoneId, setSelectedZoneId] = useState(null);
+  // Simulation is a demo tool, not part of an operator's daily screen: collapsed
+  // by default, remembered per browser.
+  const [isOpen, setIsOpen] = useState(() => {
+    try {
+      return localStorage.getItem('urban_crisis_demo_bar') === 'open';
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () => {
+    setIsOpen((prev) => {
+      try {
+        localStorage.setItem('urban_crisis_demo_bar', prev ? 'closed' : 'open');
+      } catch {
+        // storage unavailable
+      }
+      return !prev;
+    });
+  };
 
   const effectiveZoneId =
     zones.find((z) => z.id === selectedZoneId)?.id ?? zones[0]?.id ?? '';
@@ -14,11 +34,36 @@ export function SimulationBar({ zones = [], assemblyPoints = [], routing, onRunA
     assemblyPoints.find((ap) => ap.status === 'OPEN') ||
     assemblyPoints[0];
 
+  if (!isOpen) {
+    return (
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded="false"
+        className="flex w-full items-center justify-between rounded-2xl border border-dashed border-slate-700 px-4 py-2 text-sm font-semibold text-slate-400 hover:text-slate-200"
+      >
+        <span className="flex items-center gap-2">
+          <Zap className="h-4 w-4" aria-hidden="true" />
+          {t('demoScenariosToggle')}
+        </span>
+        <ChevronDown className="h-4 w-4" aria-hidden="true" />
+      </button>
+    );
+  }
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-800 bg-slate-900/95 px-4 py-2.5 shadow-md">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-dashed border-slate-700 bg-slate-900/95 px-4 py-2.5">
       <div className="flex items-center gap-2 text-xs font-bold text-cyan-300">
-        <Zap className="h-4 w-4 text-cyan-400" />
-        <span>{t('simTitle')}</span>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded="true"
+          className="flex items-center gap-2"
+        >
+          <Zap className="h-4 w-4 text-cyan-400" aria-hidden="true" />
+          <span>{t('simTitle')}</span>
+          <ChevronDown className="h-4 w-4 rotate-180" aria-hidden="true" />
+        </button>
         <select
           value={effectiveZoneId}
           onChange={(e) => setSelectedZoneId(Number(e.target.value))}
@@ -101,7 +146,7 @@ export function SimulationBar({ zones = [], assemblyPoints = [], routing, onRunA
           {t('routingApiLabel')}:{' '}
           {routing?.degraded ? t('routingApiDegraded') : t('routingApiOnline')}
           {routing?.circuit?.state && routing.circuit.state !== 'CLOSED' && (
-            <span className="font-mono text-[11px]">({routing.circuit.state})</span>
+            <span className="font-mono text-xs">({routing.circuit.state})</span>
           )}
         </span>
 

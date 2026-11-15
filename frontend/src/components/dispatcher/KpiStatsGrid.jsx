@@ -71,18 +71,18 @@ export function KpiStatsGrid({ summary = {} }) {
         return (
           <div
             key={card.label}
-            className={`rounded-2xl border p-3.5 shadow-sm ${card.tone}`}
+            className={`rounded-xl border px-3 py-2.5 ${card.tone}`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-slate-300">
+              <span className="text-xs font-semibold text-slate-300">
                 {card.label}
               </span>
               <Icon className="h-4 w-4 shrink-0 opacity-85" />
             </div>
-            <div className="mt-1.5 text-2xl font-extrabold text-white">
+            <div className="mt-1 text-xl font-bold tabular-nums text-white">
               {card.value}
             </div>
-            <div className="mt-0.5 text-[11px] text-slate-400">{card.sub}</div>
+            <div className="mt-0.5 text-xs text-slate-400">{card.sub}</div>
           </div>
         );
       })}

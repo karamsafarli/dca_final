@@ -14,14 +14,14 @@ export function ZoneCoordinateSelector({
   const { t } = useI18n();
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg">
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-blue-400" />
           <h2 className="text-sm font-bold text-white">{t('locationTitle')}</h2>
         </div>
         {origin && (
-          <span className="rounded-md bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-slate-300">
+          <span className="rounded-md bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
             {origin.lat.toFixed(4)}, {origin.lng.toFixed(4)}
           </span>
         )}
@@ -56,7 +56,7 @@ export function ZoneCoordinateSelector({
             className={cn(
               'flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition',
               pickMode
-                ? 'border-blue-400 bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                ? 'border-blue-400 bg-blue-600 text-white'
                 : 'border-slate-700 bg-slate-800/80 text-slate-200 hover:bg-slate-800'
             )}
           >

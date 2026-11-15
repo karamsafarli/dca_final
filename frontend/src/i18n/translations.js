@@ -250,6 +250,17 @@ export const TRANSLATIONS = {
       ROUTING_API_CONTROL_FAILED: 'Simulyasiya olunmuş marşrut API-sinə qoşulmaq mümkün olmadı.',
     },
 
+    // Citizen status hero & mobile action bar
+    heroLabel: 'Hara getməli',
+    heroMeta: '{distance} · ~{min} dəq piyada · {percent}% dolu',
+    heroShowMap: 'Marşrutu xəritədə göstər',
+    heroLoading: 'Ən təhlükəsiz məntəqə hesablanır…',
+    mobileSos: 'SOS göndər',
+    mobileRoute: 'Marşrut',
+    actionBarLabel: 'Sürətli əməliyyatlar',
+
+    demoScenariosToggle: 'Demo ssenariləri (münsiflər üçün simulyasiya)',
+
     // Toasts
     toastWelcome: 'Xoş gəldiniz, {name}',
     toastLoggedOut: 'Dispetçer hesabından çıxış edildi',
@@ -531,6 +542,17 @@ export const TRANSLATIONS = {
       ZONE_NOT_FOUND: 'Zone not found.',
       ROUTING_API_CONTROL_FAILED: 'Could not reach the simulated routing API.',
     },
+
+    // Citizen status hero & mobile action bar
+    heroLabel: 'Where to go',
+    heroMeta: '{distance} · ~{min} min walk · {percent}% full',
+    heroShowMap: 'Show route on map',
+    heroLoading: 'Finding the safest assembly point…',
+    mobileSos: 'Send SOS',
+    mobileRoute: 'Route',
+    actionBarLabel: 'Quick actions',
+
+    demoScenariosToggle: 'Demo scenarios (simulation for the jury)',
 
     // Toasts
     toastWelcome: 'Welcome, {name}',

@@ -1,12 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { AUTH_COOKIE_NAME } from '../config/constants.js';
-import {
-  checkLoginRateLimit,
-  clearLoginFailures,
-  recordLoginFailure,
-  requireDispatcherAuth,
-} from '../middleware/authMiddleware.js';
+import { requireDispatcherAuth } from '../middleware/authMiddleware.js';
+import { createLoginLimiter } from '../middleware/rateLimits.js';
 import {
   authenticateDispatcher,
   getAuthCookieOptions,
@@ -22,21 +18,14 @@ const loginSchema = z.object({
 
 router.post(
   '/auth/login',
-  checkLoginRateLimit,
+  createLoginLimiter(),
   validateBody(loginSchema),
   asyncHandler(async (req, res) => {
     const { username, password } = req.validatedBody;
-    try {
-      const { dispatcher, token } = await authenticateDispatcher(username, password);
-      clearLoginFailures(req.ip);
-      res.cookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions());
-      res.json({ dispatcher, token });
-    } catch (err) {
-      if (err.statusCode === 401) {
-        recordLoginFailure(req.ip);
-      }
-      throw err;
-    }
+    const { dispatcher, token } = await authenticateDispatcher(username, password);
+    // The JWT lives only in the HttpOnly cookie; never expose it to page scripts.
+    res.cookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions());
+    res.json({ dispatcher });
   })
 );
 

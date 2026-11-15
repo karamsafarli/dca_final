@@ -130,6 +130,13 @@ export function DispatcherPage({ onAlertsCountChange }) {
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-4 p-4">
+      <RedAlertBanner
+        alerts={dashboard?.alerts || []}
+        onExecute={handleExecuteAlert}
+        onDismiss={handleDismissAlert}
+        isBusy={isBusy}
+      />
+
       <SimulationBar
         zones={dashboard?.zones || []}
         roads={dashboard?.roads || []}
@@ -139,17 +146,10 @@ export function DispatcherPage({ onAlertsCountChange }) {
         isBusy={isBusy}
       />
 
-      <RedAlertBanner
-        alerts={dashboard?.alerts || []}
-        onExecute={handleExecuteAlert}
-        onDismiss={handleDismissAlert}
-        isBusy={isBusy}
-      />
-
       <KpiStatsGrid summary={dashboard?.summary || {}} />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="h-[480px] xl:col-span-7 xl:h-[620px]">
+        <div className="h-[60dvh] min-h-[420px] xl:col-span-7 xl:h-[640px]">
           <CrisisMap
             mode="dispatcher"
             roads={dashboard?.roads || []}

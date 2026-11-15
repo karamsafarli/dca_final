@@ -48,7 +48,7 @@ export function EvacuationRouteCard({ plan, isLoading, onRequestAssistance, isSu
     <div className="space-y-3">
       {/* Accessibility Active Notice */}
       {hasAccessibilityAlert && (
-        <div className="rounded-2xl border border-fuchsia-500/50 bg-fuchsia-950/40 p-3.5 shadow-lg">
+        <div className="rounded-2xl border border-fuchsia-500/50 bg-fuchsia-950/40 p-3.5">
           <div className="flex items-start gap-2.5">
             <Accessibility className="mt-0.5 h-5 w-5 shrink-0 text-fuchsia-300" />
             <div className="space-y-1 text-xs">
@@ -57,7 +57,7 @@ export function EvacuationRouteCard({ plan, isLoading, onRequestAssistance, isSu
               </div>
               <p className="text-fuchsia-100/90">{t('rerouteAccessibility')}</p>
               {skippedInaccessiblePoint && (
-                <p className="text-[11px] font-semibold text-fuchsia-200">
+                <p className="text-xs font-semibold text-fuchsia-200">
                   • {skippedInaccessiblePoint.name} ({t('inaccessibleTag')})
                 </p>
               )}
@@ -68,7 +68,7 @@ export function EvacuationRouteCard({ plan, isLoading, onRequestAssistance, isSu
 
       {/* Automatic Rerouting Alert Banner */}
       {rerouted && (
-        <div className="rounded-2xl border border-amber-500/60 bg-amber-950/60 p-3.5 shadow-lg">
+        <div className="rounded-2xl border border-amber-500/60 bg-amber-950/60 p-3.5">
           <div className="flex items-start gap-2.5">
             <AlertOctagon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
             <div className="space-y-1 text-xs">
@@ -137,16 +137,16 @@ export function EvacuationRouteCard({ plan, isLoading, onRequestAssistance, isSu
 
       {/* Recommended Evacuation Destination */}
       {recommendedPoint && (
-        <div className="rounded-2xl border border-emerald-500/50 bg-emerald-950/30 p-4 shadow-lg">
+        <div className="rounded-2xl border border-emerald-500/50 bg-emerald-950/30 p-4">
           <div className="mb-2 flex items-start justify-between gap-2">
             <div>
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300 ring-1 ring-emerald-500/40">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-300 ring-1 ring-emerald-500/40">
                   <Navigation className="h-3 w-3" />
                   {t('recommendedBadge')}
                 </span>
                 {recommendedPoint.isWheelchairAccessible !== false && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-200 ring-1 ring-fuchsia-500/35">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-xs font-semibold text-fuchsia-200 ring-1 ring-fuchsia-500/35">
                     <Accessibility className="h-3 w-3" />
                     {t('accessibleTag')}
                   </span>
@@ -216,7 +216,7 @@ export function EvacuationRouteCard({ plan, isLoading, onRequestAssistance, isSu
       )}
 
       {/* Nearby Assembly Points List */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
         <h3 className="mb-2.5 text-xs font-bold uppercase tracking-wider text-slate-400">
           {t('nearbyPointsTitle', { count: assemblyPoints.length })}
         </h3>
@@ -246,37 +246,37 @@ export function EvacuationRouteCard({ plan, isLoading, onRequestAssistance, isSu
                   <div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-xs font-bold text-white">{point.name}</span>
-                      <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-300">
+                      <span className="rounded bg-slate-800 px-1.5 py-0.5 text-xs font-medium text-slate-300">
                         {t(`pointTypes.${point.type}`)}
                       </span>
                       {point.isRecommended && (
-                        <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                        <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-xs font-bold text-emerald-300">
                           {t('recommendedShort')}
                         </span>
                       )}
                       {inaccessible ? (
-                        <span className="rounded bg-fuchsia-500/20 px-1.5 py-0.5 text-[10px] font-bold text-fuchsia-300">
+                        <span className="rounded bg-fuchsia-500/20 px-1.5 py-0.5 text-xs font-bold text-fuchsia-300">
                           {t('inaccessibleTag')}
                         </span>
                       ) : (
                         accessibleOnly && (
-                          <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
+                          <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 text-xs font-semibold text-cyan-300">
                             {t('accessibleTag')}
                           </span>
                         )
                       )}
                       {isOver90 && (
-                        <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-300">
+                        <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-xs font-bold text-red-300">
                           {t('full90Tag')}
                         </span>
                       )}
                       {unreachable && !point.isInaccessibleForUser && (
-                        <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-300">
+                        <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-xs font-bold text-red-300">
                           {t('roadBlockedTag')}
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-[11px] text-slate-400">
+                    <p className="mt-0.5 text-xs text-slate-400">
                       {point.zone?.name} • {t('statusLabel')}:{' '}
                       {t(`pointStatuses.${point.status}`)}
                     </p>
@@ -288,7 +288,7 @@ export function EvacuationRouteCard({ plan, isLoading, onRequestAssistance, isSu
                         ? formatDistance(point.route.distanceMeters)
                         : t('unreachable')}
                     </div>
-                    <div className="text-[11px] font-semibold text-slate-400">
+                    <div className="text-xs font-semibold text-slate-400">
                       {point.occupancyPercent}%
                     </div>
                   </div>

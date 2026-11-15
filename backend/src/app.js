@@ -13,6 +13,9 @@ import { getRoutingGateway } from './services/routingGateway.js';
 
 export function createApp() {
   const app = express();
+  // Behind nginx / the Vite proxy: use the real client IP for rate limiting
+  app.set('trust proxy', 1);
+  app.disable('x-powered-by');
 
   app.use(helmet({ crossOriginResourcePolicy: false }));
   app.use(
