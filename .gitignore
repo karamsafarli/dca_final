@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build & bundler outputs
+dist/
+dist-ssr/
+build/
+.vite/
+*.local
+
+# Environment files (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Logs & diagnostics
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage & caches
+coverage/
+.nyc_output/
+.eslintcache
+
+# Prisma local SQLite / generated temp files (if any)
+*.db
+*.db-journal
+
+# OS & Editor files
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+.vscode/*
+!.vscode/extensions.json
+.idea/

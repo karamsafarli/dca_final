@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: urban_crisis_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-crisis_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crisis_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-urban_crisis}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crisis_user} -d ${POSTGRES_DB:-urban_crisis}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: urban_crisis_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-crisis_user}:${POSTGRES_PASSWORD:-crisis_pass}@postgres:5432/${POSTGRES_DB:-urban_crisis}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-urban-crisis-hackathon-2026-super-secret-jwt-key}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      FRONTEND_ORIGIN: "*"
+    ports:
+      - "${BACKEND_HOST_PORT:-4050}:4000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: urban_crisis_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres_data:

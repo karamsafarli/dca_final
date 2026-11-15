@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RoadStatus {
+  OPEN
+  CONGESTED
+  CLOSED
+}
+
+enum AssemblyPointType {
+  SHELTER
+  PARK
+  STADIUM
+}
+
+enum AssemblyPointStatus {
+  OPEN
+  STANDBY
+  FULL
+  CLOSED
+}
+
+enum HazardType {
+  FIRE
+  COLLAPSE
+  FLOOD
+  MEDICAL
+}
+
+enum CitizenStatus {
+  SOS
+  SAFE
+}
+
+enum CitizenCategory {
+  STANDARD
+  SPECIAL_CARE
+}
+
+enum SosProcessStatus {
+  PENDING
+  DISPATCHED
+  RESOLVED
+}
+
+enum BrigadeType {
+  FIRE
+  MEDICAL
+  SEARCH_RESCUE
+  GENERAL
+}
+
+enum BrigadeStatus {
+  AVAILABLE
+  DISPATCHED
+  STANDBY
+}
+
+enum AlertType {
+  SOS_CLUSTER
+  CAPACITY_OVERFLOW
+}
+
+enum AlertStatus {
+  ACTIVE
+  EXECUTED
+  DISMISSED
+}
+
+enum DispatcherRole {
+  DISPATCHER
+  COMMANDER
+}
+
+model Dispatcher {
+  id           Int            @id @default(autoincrement())
+  username     String         @unique
+  fullName     String         @map("full_name")
+  badgeCode    String         @unique @map("badge_code")
+  passwordHash String         @map("password_hash")
+  role         DispatcherRole @default(DISPATCHER)
+  isActive     Boolean        @default(true) @map("is_active")
+  lastLoginAt  DateTime?      @map("last_login_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  executedAlerts CriticalAlert[]
+
+  @@map("dispatchers")
+}
+
+model Zone {
+  id           Int       @id @default(autoincrement())
+  code         String    @unique
+  name         String
+  centerLat    Float     @map("center_lat")
+  centerLng    Float     @map("center_lng")
+  radiusMeters Int       @default(2500) @map("radius_meters")
+  riskLevel    RiskLevel @default(LOW) @map("risk_level")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  roadNodes      RoadNode[]
+  roadSegments   RoadSegment[]
+  assemblyPoints AssemblyPoint[]
+  sosSignals     SosSignal[]
+  rescueBrigades RescueBrigade[]
+  criticalAlerts CriticalAlert[]
+
+  @@map("zones")
+}
+
+model RoadNode {
+  id     Int    @id @default(autoincrement())
+  code   String @unique
+  name   String
+  zoneId Int    @map("zone_id")
+  lat    Float
+  lng    Float
+
+  zone           Zone            @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  outgoingRoads  RoadSegment[]   @relation("FromNode")
+  incomingRoads  RoadSegment[]   @relation("ToNode")
+  assemblyPoints AssemblyPoint[]
+
+  @@index([zoneId])
+  @@map("road_nodes")
+}
+
+model RoadSegment {
+  id                     Int        @id @default(autoincrement())
+  code                   String     @unique
+  name                   String
+  zoneId                 Int        @map("zone_id")
+  fromNodeId             Int        @map("from_node_id")
+  toNodeId               Int        @map("to_node_id")
+  distanceMeters         Int        @map("distance_meters")
+  waypoints              Json
+  status                 RoadStatus @default(OPEN)
+  closureReason          String?    @map("closure_reason")
+  isWheelchairAccessible Boolean    @default(true) @map("is_wheelchair_accessible")
+  accessibilityNotes     String?    @map("accessibility_notes")
+  updatedAt              DateTime   @updatedAt @map("updated_at")
+
+  zone     Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  fromNode RoadNode @relation("FromNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode   RoadNode @relation("ToNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId])
+  @@index([status])
+  @@map("road_segments")
+}
+
+model AssemblyPoint {
+  id                     Int                 @id @default(autoincrement())
+  code                   String              @unique
+  name                   String
+  type                   AssemblyPointType
+  zoneId                 Int                 @map("zone_id")
+  nodeId                 Int?                @map("node_id")
+  lat                    Float
+  lng                    Float
+  address                String
+  capacity               Int
+  currentOccupancy       Int                 @default(0) @map("current_occupancy")
+  status                 AssemblyPointStatus @default(OPEN)
+  isEmergencyReserve     Boolean             @default(false) @map("is_emergency_reserve")
+  isWheelchairAccessible Boolean             @default(true) @map("is_wheelchair_accessible")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
+
+  zone           Zone            @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  node           RoadNode?       @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  criticalAlerts CriticalAlert[]
+
+  @@index([zoneId])
+  @@index([status])
+  @@map("assembly_points")
+}
+
+model RescueBrigade {
+  id           Int           @id @default(autoincrement())
+  code         String        @unique
+  name         String
+  unitType     BrigadeType   @map("unit_type")
+  zoneId       Int           @map("zone_id")
+  lat          Float
+  lng          Float
+  status       BrigadeStatus @default(AVAILABLE)
+  currentSosId Int?          @map("current_sos_id")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  zone       Zone        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  sosSignals SosSignal[]
+
+  @@index([zoneId])
+  @@index([status])
+  @@map("rescue_brigades")
+}
+
+model SosSignal {
+  id                Int              @id @default(autoincrement())
+  citizenCode       String           @map("citizen_code")
+  citizenName       String?          @map("citizen_name")
+  phone             String?
+  hazardType        HazardType       @map("hazard_type")
+  citizenStatus     CitizenStatus    @default(SOS) @map("citizen_status")
+  citizenCategory   CitizenCategory  @default(STANDARD) @map("citizen_category")
+  priorityLevel     Int              @default(2) @map("priority_level")
+  zoneId            Int              @map("zone_id")
+  lat               Float
+  lng               Float
+  notes             String?
+  status            SosProcessStatus @default(PENDING)
+  assignedBrigadeId Int?             @map("assigned_brigade_id")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  zone            Zone           @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  assignedBrigade RescueBrigade? @relation(fields: [assignedBrigadeId], references: [id], onDelete: SetNull)
+
+  @@index([zoneId, createdAt])
+  @@index([citizenStatus, createdAt])
+  @@index([priorityLevel, createdAt])
+  @@map("sos_signals")
+}
+
+model CriticalAlert {
+  id               Int         @id @default(autoincrement())
+  alertType        AlertType   @map("alert_type")
+  zoneId           Int         @map("zone_id")
+  assemblyPointId  Int?        @map("assembly_point_id")
+  centerLat        Float       @map("center_lat")
+  centerLng        Float       @map("center_lng")
+  sosCount         Int         @default(0) @map("sos_count")
+  occupancyPercent Float?      @map("occupancy_percent")
+  title            String
+  message          String
+  status           AlertStatus @default(ACTIVE)
+  actionTaken            Json?       @map("action_taken")
+  executedByDispatcherId Int?        @map("executed_by_dispatcher_id")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  executedAt             DateTime?   @map("executed_at")
+
+  zone                 Zone           @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  assemblyPoint        AssemblyPoint? @relation(fields: [assemblyPointId], references: [id], onDelete: SetNull)
+  executedByDispatcher Dispatcher?    @relation(fields: [executedByDispatcherId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([zoneId])
+  @@map("critical_alerts")
+}
