@@ -2,44 +2,136 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens (RGB triplets so Tailwind can apply alpha: bg-danger/10).
+ * Neutral, low-chrome surfaces; colour is reserved for meaning:
+ *   danger = SOS / critical, success = safe route, warning = degraded / caution,
+ *   priority = accessibility & Priority #1 (blue, like the accessibility symbol),
+ *   info = neutral live data. Primary actions use "ink" (black / white).
+ */
+:root {
+  --canvas: 247 247 245;
+  --surface: 255 255 255;
+  --subtle: 240 240 237;
+  --line: 228 228 224;
+  --line-strong: 208 208 203;
+  --fg: 23 23 23;
+  --muted: 92 92 98;
+  --faint: 140 140 146;
+  --ink: 23 23 23;
+  --ink-fg: 255 255 255;
+  --danger: 220 38 38;
+  --danger-fg: 185 28 28;
+  --success: 22 163 74;
+  --success-fg: 21 128 61;
+  --warning: 217 119 6;
+  --warning-fg: 161 98 7;
+  --priority: 37 99 235;
+  --priority-fg: 29 78 216;
+  --info: 2 132 199;
+  --info-fg: 3 105 161;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: 10 11 13;
+  --surface: 20 22 25;
+  --subtle: 30 33 37;
+  --line: 40 44 50;
+  --line-strong: 58 63 70;
+  --fg: 236 237 238;
+  --muted: 160 164 170;
+  --faint: 112 117 124;
+  --ink: 236 237 238;
+  --ink-fg: 14 15 17;
+  /* Solid fills keep AA contrast with white text; -fg tokens are the light text tints */
+  --danger: 220 38 38;
+  --danger-fg: 252 129 129;
+  --success: 22 150 70;
+  --success-fg: 110 231 150;
+  --warning: 217 119 6;
+  --warning-fg: 252 196 90;
+  --priority: 50 105 240;
+  --priority-fg: 150 180 255;
+  --info: 14 130 190;
+  --info-fg: 125 211 252;
+  color-scheme: dark;
+}
+
 @layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
-    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    @apply bg-canvas font-sans text-fg antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-fg/40 ring-offset-2 ring-offset-canvas;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Custom Leaflet dark-mode polish & pulsing markers */
+/* Leaflet: muted, near-monochrome OSM basemap per theme */
+.leaflet-tile-pane {
+  filter: grayscale(0.9) contrast(0.92) brightness(1.04);
+}
+.dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) grayscale(0.9) brightness(0.82) contrast(0.92);
+}
 .leaflet-container {
-  background: #0f172a;
+  background: rgb(var(--subtle));
   font-family: inherit;
 }
-
-.leaflet-tile-pane {
-  filter: invert(100%) hue-rotate(180deg) brightness(92%) contrast(92%) saturate(75%);
-}
-
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
-  background: #1e293b;
-  color: #f1f5f9;
-  border: 1px solid #334155;
+  background: rgb(var(--surface));
+  color: rgb(var(--fg));
+  border: 1px solid rgb(var(--line));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 10px;
+}
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  background: rgb(var(--surface));
+  color: rgb(var(--fg));
+  border-color: rgb(var(--line));
+}
+.leaflet-control-attribution {
+  background: rgb(var(--surface) / 0.8) !important;
+  color: rgb(var(--faint));
+}
+.leaflet-control-attribution a {
+  color: rgb(var(--muted));
 }
 
-@keyframes crisisPulse {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.75);
-  }
-  70% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 14px rgba(239, 68, 68, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
+/* Single, restrained "live" pulse for active SOS markers only */
+@keyframes livePulse {
+  0% { box-shadow: 0 0 0 0 rgb(var(--danger) / 0.5); }
+  70% { box-shadow: 0 0 0 10px rgb(var(--danger) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--danger) / 0); }
 }
-
 .sos-pulse-dot {
-  animation: crisisPulse 1.6s infinite;
+  animation: livePulse 1.8s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sos-pulse-dot { animation: none; }
+}
+
+/* Toasts follow the theme tokens */
+.Toastify__toast {
+  background: rgb(var(--surface));
+  color: rgb(var(--fg));
+  border: 1px solid rgb(var(--line));
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+.Toastify__close-button {
+  color: rgb(var(--muted));
 }

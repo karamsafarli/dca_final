@@ -1,32 +1,18 @@
-import {
-  Accessibility,
-  AlertOctagon,
-  Ambulance,
-  Clock,
-  Navigation,
-  Route,
-  Users,
-} from 'lucide-react';
+import { Accessibility, Ambulance, Shuffle } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { cn, formatDistance } from '../../lib/utils';
+import { Button, Callout, Card, CardHeader } from '../ui/primitives';
 
-function getOccupancyBarClass(percent) {
-  if (percent >= 90) return 'bg-red-500';
-  if (percent >= 70) return 'bg-amber-500';
-  return 'bg-emerald-500';
+function occupancyTone(percent) {
+  if (percent >= 90) return { bar: 'bg-danger', text: 'text-danger-fg' };
+  if (percent >= 70) return { bar: 'bg-warning', text: 'text-warning-fg' };
+  return { bar: 'bg-success', text: 'text-muted' };
 }
 
 export function EvacuationRouteCard({ plan, isLoading, onRequestAssistance, isSubmitting }) {
   const { t } = useI18n();
 
-  if (isLoading && !plan) {
-    return (
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 text-sm text-slate-400">
-        {t('calculatingRoute')}
-      </div>
-    );
-  }
-
+  if (isLoading && !plan) return null; // the hero shows the loading state
   if (!plan) return null;
 
   const {
@@ -41,273 +27,150 @@ export function EvacuationRouteCard({ plan, isLoading, onRequestAssistance, isSu
     assemblyPoints = [],
   } = plan;
 
-  const hasAccessibilityAlert =
-    accessibleOnly || rerouteReasons.includes('ACCESSIBILITY_REQUIRED');
+  const showAccessibility = accessibleOnly || rerouteReasons.includes('ACCESSIBILITY_REQUIRED');
+  const rerouteLines = [
+    rerouteReasons.includes('ROAD_CLOSURE') &&
+      blockedRoads.length > 0 &&
+      t('rerouteRoadClosure', { roads: blockedRoads.map((r) => r.name).join(', ') }),
+    rerouteReasons.includes('OCCUPANCY_THRESHOLD_90') &&
+      skippedCrowdedPoint &&
+      t('rerouteOccupancy90', {
+        name: skippedCrowdedPoint.name,
+        percent: skippedCrowdedPoint.occupancyPercent,
+      }),
+    rerouteReasons.includes('ALL_POINTS_HIGH_OCCUPANCY') && t('rerouteAllHigh'),
+  ].filter(Boolean);
 
   return (
     <div className="space-y-3">
-      {/* Accessibility Active Notice */}
-      {hasAccessibilityAlert && (
-        <div className="rounded-2xl border border-fuchsia-500/50 bg-fuchsia-950/40 p-3.5">
-          <div className="flex items-start gap-2.5">
-            <Accessibility className="mt-0.5 h-5 w-5 shrink-0 text-fuchsia-300" />
-            <div className="space-y-1 text-xs">
-              <div className="font-bold text-fuchsia-200">
-                {t('accessibilityActiveBadge')}
-              </div>
-              <p className="text-fuchsia-100/90">{t('rerouteAccessibility')}</p>
-              {skippedInaccessiblePoint && (
-                <p className="text-xs font-semibold text-fuchsia-200">
-                  • {skippedInaccessiblePoint.name} ({t('inaccessibleTag')})
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Automatic Rerouting Alert Banner */}
-      {rerouted && (
-        <div className="rounded-2xl border border-amber-500/60 bg-amber-950/60 p-3.5">
-          <div className="flex items-start gap-2.5">
-            <AlertOctagon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
-            <div className="space-y-1 text-xs">
-              <div className="font-bold text-amber-200">{t('rerouteBannerTitle')}</div>
-              {rerouteReasons.includes('ROAD_CLOSURE') && blockedRoads.length > 0 && (
-                <p className="text-amber-100/90">
-                  •{' '}
-                  {t('rerouteRoadClosure', {
-                    roads: blockedRoads.map((r) => r.name).join(', '),
-                  })}
-                </p>
-              )}
-              {rerouteReasons.includes('ALL_POINTS_HIGH_OCCUPANCY') && (
-                <p className="text-amber-100/90">• {t('rerouteAllHigh')}</p>
-              )}
-              {rerouteReasons.includes('OCCUPANCY_THRESHOLD_90') &&
-                skippedCrowdedPoint && (
-                  <p className="text-amber-100/90">
-                    •{' '}
-                    {t('rerouteOccupancy90', {
-                      name: skippedCrowdedPoint.name,
-                      percent: skippedCrowdedPoint.occupancyPercent,
-                    })}
-                  </p>
-                )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* No reachable / no step-free point: never leave the citizen with an empty card */}
       {assistanceRequired && (
-        <div
-          role="alert"
-          data-testid="assistance-required"
-          className="rounded-2xl border border-red-500/60 bg-red-950/50 p-4"
+        <div data-testid="assistance-required">
+          <Callout
+            tone="danger"
+            role="alert"
+            icon={<Ambulance className="h-4 w-4" aria-hidden="true" />}
+            title={
+              assistanceRequired === 'NO_ACCESSIBLE_ROUTE'
+                ? t('assistanceNoAccessibleTitle')
+                : t('assistanceNoReachableTitle')
+            }
+          >
+            <p>
+              {assistanceRequired === 'NO_ACCESSIBLE_ROUTE'
+                ? t('assistanceNoAccessibleBody')
+                : t('assistanceNoReachableBody')}
+            </p>
+            {onRequestAssistance && (
+              <Button
+                variant="danger"
+                size="lg"
+                className="mt-3 w-full"
+                disabled={isSubmitting}
+                onClick={onRequestAssistance}
+              >
+                <Ambulance className="h-5 w-5" aria-hidden="true" />
+                {t('assistanceRequestBtn')}
+              </Button>
+            )}
+          </Callout>
+        </div>
+      )}
+
+      {rerouted && rerouteLines.length > 0 && (
+        <Callout
+          tone="warning"
+          icon={<Shuffle className="h-4 w-4" aria-hidden="true" />}
+          title={t('rerouteBannerTitle')}
         >
-          <div className="flex items-start gap-2.5">
-            <Ambulance className="mt-0.5 h-5 w-5 shrink-0 text-red-300" aria-hidden="true" />
-            <div className="space-y-1.5 text-sm">
-              <p className="font-bold text-red-100">
-                {assistanceRequired === 'NO_ACCESSIBLE_ROUTE'
-                  ? t('assistanceNoAccessibleTitle')
-                  : t('assistanceNoReachableTitle')}
-              </p>
-              <p className="text-red-100/90">
-                {assistanceRequired === 'NO_ACCESSIBLE_ROUTE'
-                  ? t('assistanceNoAccessibleBody')
-                  : t('assistanceNoReachableBody')}
-              </p>
-            </div>
-          </div>
-          {onRequestAssistance && (
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={onRequestAssistance}
-              className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-500 disabled:opacity-50"
-            >
-              <Ambulance className="h-5 w-5" aria-hidden="true" />
-              {t('assistanceRequestBtn')}
-            </button>
-          )}
-        </div>
+          <ul className="space-y-1">
+            {rerouteLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </Callout>
       )}
 
-      {/* Recommended Evacuation Destination */}
-      {recommendedPoint && (
-        <div className="rounded-2xl border border-emerald-500/50 bg-emerald-950/30 p-4">
-          <div className="mb-2 flex items-start justify-between gap-2">
-            <div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-300 ring-1 ring-emerald-500/40">
-                  <Navigation className="h-3 w-3" />
-                  {t('recommendedBadge')}
-                </span>
-                {recommendedPoint.isWheelchairAccessible !== false && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-xs font-semibold text-fuchsia-200 ring-1 ring-fuchsia-500/35">
-                    <Accessibility className="h-3 w-3" />
-                    {t('accessibleTag')}
-                  </span>
-                )}
-              </div>
-              <h3 className="mt-1.5 text-base font-bold text-white">
-                {recommendedPoint.name}
-              </h3>
-              <p className="text-xs text-slate-400">
-                {t(`pointTypes.${recommendedPoint.type}`)} • {recommendedPoint.address}
-              </p>
-            </div>
-
-            <div className="text-right">
-              <div className="text-lg font-extrabold text-emerald-300">
-                {formatDistance(recommendedPoint.route?.distanceMeters)}
-              </div>
-              <div className="flex items-center justify-end gap-1 text-xs text-slate-300">
-                <Clock className="h-3.5 w-3.5 text-emerald-400" />
-                <span>
-                  {t('walkMinutes', {
-                    min: recommendedPoint.route?.estimatedMinutes || 1,
-                  })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Occupancy Progress */}
-          <div className="mt-3 space-y-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1 text-slate-300">
-                <Users className="h-3.5 w-3.5 text-slate-400" />
-                {t('currentOccupancy', {
-                  curr: recommendedPoint.currentOccupancy,
-                  cap: recommendedPoint.capacity,
-                })}
-              </span>
-              <span className="font-bold text-emerald-300">
-                {recommendedPoint.occupancyPercent}%
-              </span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
-              <div
-                className={cn(
-                  'h-full rounded-full transition-all',
-                  getOccupancyBarClass(recommendedPoint.occupancyPercent)
-                )}
-                style={{ width: `${Math.min(100, recommendedPoint.occupancyPercent)}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Road Corridor Path */}
-          {recommendedPoint.route?.roadNamesUsed?.length > 0 && (
-            <div className="mt-3 rounded-xl bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
-              <div className="mb-1 flex items-center gap-1.5 font-semibold text-emerald-300">
-                <Route className="h-3.5 w-3.5" />
-                <span>{t('routeCorridor')}</span>
-              </div>
-              <p className="leading-relaxed text-slate-300">
-                {recommendedPoint.route.roadNamesUsed.join(' → ')}
-              </p>
-            </div>
+      {showAccessibility && (
+        <Callout
+          tone="priority"
+          icon={<Accessibility className="h-4 w-4" aria-hidden="true" />}
+          title={t('accessibilityActiveBadge')}
+        >
+          <p>{t('rerouteAccessibility')}</p>
+          {skippedInaccessiblePoint && (
+            <p className="mt-1 text-muted">
+              {skippedInaccessiblePoint.name} — {t('inaccessibleTag')}
+            </p>
           )}
-        </div>
+        </Callout>
       )}
 
-      {/* Nearby Assembly Points List */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
-        <h3 className="mb-2.5 text-xs font-bold uppercase tracking-wider text-slate-400">
-          {t('nearbyPointsTitle', { count: assemblyPoints.length })}
-        </h3>
+      <Card aria-labelledby="route-details-title">
+        <CardHeader id="route-details-title" title={t('routeDetailsTitle')} />
 
-        <div className="max-h-[290px] space-y-2 overflow-y-auto pr-1">
+        {recommendedPoint?.route?.roadNamesUsed?.length > 0 && (
+          <div className="px-4 pt-3">
+            <p className="text-xs text-muted">{t('routeCorridor')}</p>
+            <p className="mt-1 text-sm leading-relaxed text-fg">
+              {recommendedPoint.route.roadNamesUsed.join(' → ')}
+            </p>
+          </div>
+        )}
+
+        <div className="px-4 pb-2 pt-4">
+          <p className="text-xs text-muted">
+            {t('nearbyPointsShort')} · {assemblyPoints.length}
+          </p>
+        </div>
+        <ul className="max-h-[360px] divide-y divide-line overflow-y-auto border-t border-line">
           {assemblyPoints.map((point) => {
-            const isOver90 = point.occupancyPercent >= 90 || point.status === 'FULL';
+            const percent = point.occupancyPercent ?? 0;
+            const tone = occupancyTone(percent);
             const unreachable = !point.route?.reachable;
-            const inaccessible =
-              point.isInaccessibleForUser || point.isWheelchairAccessible === false;
+            const inaccessible = point.isInaccessibleForUser || (accessibleOnly && point.isWheelchairAccessible === false);
+            const dimmed = !point.isRecommended && (unreachable || inaccessible || point.status === 'FULL');
 
             return (
-              <div
-                key={point.id}
-                className={cn(
-                  'rounded-xl border p-3 transition',
-                  point.isRecommended
-                    ? 'border-emerald-500/50 bg-emerald-950/20'
-                    : point.isInaccessibleForUser
-                    ? 'border-fuchsia-500/30 bg-fuchsia-950/15 opacity-75'
-                    : isOver90 || unreachable
-                    ? 'border-red-500/30 bg-red-950/15 opacity-80'
-                    : 'border-slate-800 bg-slate-950/60'
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
+              <li key={point.id} className={cn('px-4 py-3', dimmed && 'opacity-60')}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs font-bold text-white">{point.name}</span>
-                      <span className="rounded bg-slate-800 px-1.5 py-0.5 text-xs font-medium text-slate-300">
-                        {t(`pointTypes.${point.type}`)}
-                      </span>
+                      <span className="truncate text-sm font-medium text-fg">{point.name}</span>
                       {point.isRecommended && (
-                        <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-xs font-bold text-emerald-300">
-                          {t('recommendedShort')}
-                        </span>
-                      )}
-                      {inaccessible ? (
-                        <span className="rounded bg-fuchsia-500/20 px-1.5 py-0.5 text-xs font-bold text-fuchsia-300">
-                          {t('inaccessibleTag')}
-                        </span>
-                      ) : (
-                        accessibleOnly && (
-                          <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 text-xs font-semibold text-cyan-300">
-                            {t('accessibleTag')}
-                          </span>
-                        )
-                      )}
-                      {isOver90 && (
-                        <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-xs font-bold text-red-300">
-                          {t('full90Tag')}
-                        </span>
-                      )}
-                      {unreachable && !point.isInaccessibleForUser && (
-                        <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-xs font-bold text-red-300">
-                          {t('roadBlockedTag')}
+                        <span className="rounded bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success-fg">
+                          {t('recommendedPill')}
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-400">
-                      {point.zone?.name} • {t('statusLabel')}:{' '}
-                      {t(`pointStatuses.${point.status}`)}
+                    <p className="mt-0.5 text-xs text-muted">
+                      {t(`pointTypes.${point.type}`)}
+                      {point.zone?.name ? ` · ${point.zone.name}` : ''}
+                      {inaccessible && (
+                        <span className="text-priority-fg"> · {t('inaccessibleTag')}</span>
+                      )}
+                      {unreachable && !inaccessible && (
+                        <span className="text-danger-fg"> · {t('roadBlockedTag')}</span>
+                      )}
+                      {(percent >= 90 || point.status === 'FULL') && (
+                        <span className="text-danger-fg"> · {t('full90Tag')}</span>
+                      )}
                     </p>
                   </div>
-
-                  <div className="text-right text-xs">
-                    <div className="font-bold text-slate-200">
-                      {point.route?.reachable
-                        ? formatDistance(point.route.distanceMeters)
-                        : t('unreachable')}
+                  <div className="shrink-0 text-right">
+                    <div className="text-sm font-medium text-fg tabular">
+                      {unreachable ? t('unreachable') : formatDistance(point.route.distanceMeters)}
                     </div>
-                    <div className="text-xs font-semibold text-slate-400">
-                      {point.occupancyPercent}%
-                    </div>
+                    <div className={cn('text-xs tabular', tone.text)}>{percent}%</div>
                   </div>
                 </div>
-
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
-                  <div
-                    className={cn(
-                      'h-full rounded-full transition-all',
-                      getOccupancyBarClass(point.occupancyPercent)
-                    )}
-                    style={{ width: `${Math.min(100, point.occupancyPercent)}%` }}
-                  />
+                <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-subtle">
+                  <div className={cn('h-full rounded-full', tone.bar)} style={{ width: `${Math.min(100, percent)}%` }} />
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
-      </div>
+        </ul>
+      </Card>
     </div>
   );
 }

@@ -1,91 +1,66 @@
-import {
-  AlertTriangle,
-  Building,
-  CheckCircle2,
-  RouteOff,
-  Siren,
-  Truck,
-} from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
+import { cn } from '../../lib/utils';
 
+/** Neutral metric strip; a value turns red/amber only when it needs attention. */
 export function KpiStatsGrid({ summary = {} }) {
   const { t } = useI18n();
+  const total = (summary.dispatchedBrigadesCount ?? 0) + (summary.availableBrigadesCount ?? 0);
 
-  const cards = [
+  const metrics = [
     {
       label: t('kpiActiveSos'),
       value: summary.activeSosCount ?? 0,
-      sub: t('kpiPrioritySub', {
-        priority: summary.prioritySosCount ?? 0,
-        pending: summary.pendingSosCount ?? 0,
-      }),
-      icon: Siren,
-      tone: 'border-red-500/30 bg-red-950/20 text-red-300',
+      sub: t('kpiPrioritySub', { priority: summary.prioritySosCount ?? 0, pending: summary.pendingSosCount ?? 0 }),
+      tone: (summary.prioritySosCount ?? 0) > 0 ? 'danger' : null,
     },
     {
       label: t('kpiActiveAlerts'),
       value: summary.activeAlertsCount ?? 0,
       sub: t('kpiCrisisAlgo'),
-      icon: AlertTriangle,
-      tone:
-        (summary.activeAlertsCount ?? 0) > 0
-          ? 'border-red-500/60 bg-red-950/40 text-red-200'
-          : 'border-slate-800 bg-slate-900/90 text-slate-300',
+      tone: (summary.activeAlertsCount ?? 0) > 0 ? 'danger' : null,
     },
     {
       label: t('kpiBrigades'),
-      value: `${summary.dispatchedBrigadesCount ?? 0} / ${
-        (summary.dispatchedBrigadesCount ?? 0) + (summary.availableBrigadesCount ?? 0)
-      }`,
+      value: `${summary.dispatchedBrigadesCount ?? 0}/${total}`,
       sub: t('kpiBrigadesSub', { count: summary.availableBrigadesCount ?? 0 }),
-      icon: Truck,
-      tone: 'border-cyan-500/30 bg-cyan-950/20 text-cyan-300',
+      tone: (summary.availableBrigadesCount ?? 0) === 0 ? 'warning' : null,
     },
     {
       label: t('kpiOpenShelters'),
       value: summary.openSheltersCount ?? 0,
       sub: t('kpiCrowdedSub', { count: summary.crowdedSheltersCount ?? 0 }),
-      icon: Building,
-      tone: 'border-emerald-500/30 bg-emerald-950/20 text-emerald-300',
+      tone: (summary.crowdedSheltersCount ?? 0) > 0 ? 'warning' : null,
     },
     {
       label: t('kpiClosedRoads'),
       value: summary.closedRoadsCount ?? 0,
       sub: t('kpiAutoRouteSub'),
-      icon: RouteOff,
-      tone: 'border-amber-500/30 bg-amber-950/20 text-amber-300',
+      tone: (summary.closedRoadsCount ?? 0) > 0 ? 'warning' : null,
     },
     {
       label: t('kpiSafeConfirmations'),
       value: summary.safeConfirmationsCount ?? 0,
       sub: t('kpiCitizenStatusSub'),
-      icon: CheckCircle2,
-      tone: 'border-slate-800 bg-slate-900/90 text-emerald-300',
+      tone: null,
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-      {cards.map((card) => {
-        const Icon = card.icon;
-        return (
-          <div
-            key={card.label}
-            className={`rounded-xl border px-3 py-2.5 ${card.tone}`}
+    <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-3 xl:grid-cols-6 [&>*]:bg-surface gap-px">
+      {metrics.map((m) => (
+        <div key={m.label} className="px-4 py-3">
+          <dt className="truncate text-xs text-muted">{m.label}</dt>
+          <dd
+            className={cn(
+              'mt-1 text-2xl font-semibold tracking-tight tabular',
+              m.tone === 'danger' ? 'text-danger-fg' : m.tone === 'warning' ? 'text-warning-fg' : 'text-fg'
+            )}
           >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-300">
-                {card.label}
-              </span>
-              <Icon className="h-4 w-4 shrink-0 opacity-85" />
-            </div>
-            <div className="mt-1 text-xl font-bold tabular-nums text-white">
-              {card.value}
-            </div>
-            <div className="mt-0.5 text-xs text-slate-400">{card.sub}</div>
-          </div>
-        );
-      })}
-    </div>
+            {m.value}
+          </dd>
+          <dd className="mt-0.5 truncate text-xs text-faint">{m.sub}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

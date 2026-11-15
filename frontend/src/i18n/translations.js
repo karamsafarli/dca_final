@@ -261,6 +261,36 @@ export const TRANSLATIONS = {
 
     demoScenariosToggle: 'Demo ssenariləri (münsiflər üçün simulyasiya)',
 
+    // App shells (role-based navigation) & theme
+    brandShort: 'Bakı Təxliyə',
+    operatorLink: 'Operator girişi',
+    consoleTitle: 'Dispetçer konsolu',
+    openCitizenView: 'Vətəndaş görünüşü',
+    backToCitizen: 'Vətəndaş tətbiqinə qayıt',
+    themeLabel: 'Mövzu',
+    themeLight: 'Açıq',
+    themeDark: 'Tünd',
+    themeSystem: 'Sistem',
+    languageLabel: 'Dil',
+    connectionLive: 'Canlı bağlantı',
+    connectionLost: 'Bağlantı bərpa olunur…',
+    operatorMenu: 'Operator menyusu',
+    activeAlertsLabel: '{count} aktiv həyəcan',
+
+    sosCardHint: 'Təhlükə növünə toxunun — siqnal dərhal dispetçerə çatır.',
+    optionalDetails: 'Əlavə məlumat (istəyə bağlı)',
+    profileLabel: 'Profil',
+    routeDetailsTitle: 'Marşrut təfərrüatları',
+    nearbyPointsShort: 'Yaxın məntəqələr',
+    recommendedPill: 'Tövsiyə olunan',
+
+    distanceLabel: 'Məsafə',
+    walkLabel: 'Piyada',
+    minutesShort: 'dəq',
+    occupancyLabel: 'Doluluq',
+    simGroupCrisis: 'Böhran',
+    simGroupRouting: 'Marşrut API',
+
     // Toasts
     toastWelcome: 'Xoş gəldiniz, {name}',
     toastLoggedOut: 'Dispetçer hesabından çıxış edildi',
@@ -553,6 +583,36 @@ export const TRANSLATIONS = {
     actionBarLabel: 'Quick actions',
 
     demoScenariosToggle: 'Demo scenarios (simulation for the jury)',
+
+    // App shells (role-based navigation) & theme
+    brandShort: 'Baku Evacuation',
+    operatorLink: 'Operator sign-in',
+    consoleTitle: 'Dispatch console',
+    openCitizenView: 'Citizen view',
+    backToCitizen: 'Back to the citizen app',
+    themeLabel: 'Theme',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    themeSystem: 'System',
+    languageLabel: 'Language',
+    connectionLive: 'Live connection',
+    connectionLost: 'Reconnecting…',
+    operatorMenu: 'Operator menu',
+    activeAlertsLabel: '{count} active alerts',
+
+    sosCardHint: 'Tap the hazard type — the signal reaches a dispatcher immediately.',
+    optionalDetails: 'Additional details (optional)',
+    profileLabel: 'Profile',
+    routeDetailsTitle: 'Route details',
+    nearbyPointsShort: 'Nearby points',
+    recommendedPill: 'Recommended',
+
+    distanceLabel: 'Distance',
+    walkLabel: 'Walk',
+    minutesShort: 'min',
+    occupancyLabel: 'Occupancy',
+    simGroupCrisis: 'Crisis',
+    simGroupRouting: 'Routing API',
 
     // Toasts
     toastWelcome: 'Welcome, {name}',

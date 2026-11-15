@@ -1,195 +1,124 @@
-import { Flame, Gauge, RotateCcw, RouteOff, Timer, Wifi, WifiOff, Zap } from 'lucide-react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, FlaskConical, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { useI18n } from '../../i18n/I18nContext';
+import { Button, StatusDot } from '../ui/primitives';
 
+const STORAGE_KEY = 'urban_crisis_demo_bar';
+
+/**
+ * Demo / jury tool, not part of an operator's daily screen: collapsed by
+ * default (remembered per browser) and visually quiet.
+ */
 export function SimulationBar({ zones = [], assemblyPoints = [], routing, onRunAction, isBusy }) {
   const { t } = useI18n();
   const [selectedZoneId, setSelectedZoneId] = useState(null);
-  // Simulation is a demo tool, not part of an operator's daily screen: collapsed
-  // by default, remembered per browser.
   const [isOpen, setIsOpen] = useState(() => {
     try {
-      return localStorage.getItem('urban_crisis_demo_bar') === 'open';
+      return localStorage.getItem(STORAGE_KEY) === 'open';
     } catch {
       return false;
     }
   });
-  const toggle = () => {
+
+  const toggle = () =>
     setIsOpen((prev) => {
       try {
-        localStorage.setItem('urban_crisis_demo_bar', prev ? 'closed' : 'open');
+        localStorage.setItem(STORAGE_KEY, prev ? 'closed' : 'open');
       } catch {
         // storage unavailable
       }
       return !prev;
     });
-  };
 
-  const effectiveZoneId =
-    zones.find((z) => z.id === selectedZoneId)?.id ?? zones[0]?.id ?? '';
-
+  const zoneId = zones.find((z) => z.id === selectedZoneId)?.id ?? zones[0]?.id ?? '';
   const openPoint =
-    assemblyPoints.find((ap) => ap.status === 'OPEN' && ap.zoneId === effectiveZoneId) ||
+    assemblyPoints.find((ap) => ap.status === 'OPEN' && ap.zoneId === zoneId) ||
     assemblyPoints.find((ap) => ap.status === 'OPEN') ||
     assemblyPoints[0];
 
-  if (!isOpen) {
-    return (
+  return (
+    <div className="rounded-xl border border-dashed border-line-strong">
       <button
         type="button"
         onClick={toggle}
-        aria-expanded="false"
-        className="flex w-full items-center justify-between rounded-2xl border border-dashed border-slate-700 px-4 py-2 text-sm font-semibold text-slate-400 hover:text-slate-200"
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-sm text-muted transition hover:text-fg"
       >
         <span className="flex items-center gap-2">
-          <Zap className="h-4 w-4" aria-hidden="true" />
+          <FlaskConical className="h-4 w-4" aria-hidden="true" />
           {t('demoScenariosToggle')}
         </span>
-        <ChevronDown className="h-4 w-4" aria-hidden="true" />
+        <ChevronDown className={`h-4 w-4 transition ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
-    );
-  }
 
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-dashed border-slate-700 bg-slate-900/95 px-4 py-2.5">
-      <div className="flex items-center gap-2 text-xs font-bold text-cyan-300">
-        <button
-          type="button"
-          onClick={toggle}
-          aria-expanded="true"
-          className="flex items-center gap-2"
-        >
-          <Zap className="h-4 w-4 text-cyan-400" aria-hidden="true" />
-          <span>{t('simTitle')}</span>
-          <ChevronDown className="h-4 w-4 rotate-180" aria-hidden="true" />
-        </button>
-        <select
-          value={effectiveZoneId}
-          onChange={(e) => setSelectedZoneId(Number(e.target.value))}
-          className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs font-medium text-white focus:outline-none"
-        >
-          {zones.map((z) => (
-            <option key={z.id} value={z.id}>
-              {z.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {isOpen && (
+        <div className="flex flex-col gap-3 border-t border-dashed border-line-strong px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-faint">{t('simGroupCrisis')}</span>
+            <select
+              aria-label={t('selectDistrictLabel')}
+              value={zoneId}
+              onChange={(e) => setSelectedZoneId(Number(e.target.value))}
+              className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-fg focus:outline-none"
+            >
+              {zones.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.name}
+                </option>
+              ))}
+            </select>
+            <Button size="sm" disabled={isBusy || !zoneId} onClick={() => onRunAction('sos-burst', { zoneId })}>
+              {t('sim4Sos')}
+            </Button>
+            <Button
+              size="sm"
+              disabled={isBusy || !zoneId}
+              onClick={() => onRunAction('road-toggle', { zoneId, status: 'CLOSED' })}
+            >
+              {t('simCloseRoad')}
+            </Button>
+            <Button
+              size="sm"
+              disabled={isBusy || !openPoint}
+              onClick={() => onRunAction('occupancy-spike', { assemblyPointId: openPoint?.id, targetPercent: 92 })}
+            >
+              {t('simSpike92')}
+            </Button>
+            <Button
+              size="sm"
+              disabled={isBusy || !openPoint}
+              onClick={() => onRunAction('occupancy-spike', { assemblyPointId: openPoint?.id, targetPercent: 97 })}
+            >
+              {t('simSpike97')}
+            </Button>
+          </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={isBusy || !effectiveZoneId}
-          onClick={() => onRunAction('sos-burst', { zoneId: effectiveZoneId })}
-          className="flex items-center gap-1.5 rounded-xl border border-red-500/40 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-500/25 disabled:opacity-50"
-        >
-          <Flame className="h-3.5 w-3.5" />
-          <span>{t('sim4Sos')}</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={isBusy || !effectiveZoneId}
-          onClick={() =>
-            onRunAction('road-toggle', {
-              zoneId: effectiveZoneId,
-              status: 'CLOSED',
-            })
-          }
-          className="flex items-center gap-1.5 rounded-xl border border-orange-500/40 bg-orange-500/15 px-3 py-1.5 text-xs font-semibold text-orange-200 transition hover:bg-orange-500/25 disabled:opacity-50"
-        >
-          <RouteOff className="h-3.5 w-3.5" />
-          <span>{t('simCloseRoad')}</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={isBusy || !openPoint}
-          onClick={() =>
-            onRunAction('occupancy-spike', {
-              assemblyPointId: openPoint?.id,
-              targetPercent: 92,
-            })
-          }
-          className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/25 disabled:opacity-50"
-        >
-          <Gauge className="h-3.5 w-3.5" />
-          <span>{t('simSpike92')}</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={isBusy || !openPoint}
-          onClick={() =>
-            onRunAction('occupancy-spike', {
-              assemblyPointId: openPoint?.id,
-              targetPercent: 97,
-            })
-          }
-          className="flex items-center gap-1.5 rounded-xl border border-rose-500/50 bg-rose-600/25 px-3 py-1.5 text-xs font-semibold text-rose-100 transition hover:bg-rose-600/35 disabled:opacity-50"
-        >
-          <Gauge className="h-3.5 w-3.5" />
-          <span>{t('simSpike97')}</span>
-        </button>
-
-        <span
-          data-testid="routing-api-status"
-          title={routing?.circuit ? `Circuit: ${routing.circuit.state}` : undefined}
-          className={
-            routing?.degraded
-              ? 'flex items-center gap-1.5 rounded-xl border border-amber-500/50 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200'
-              : 'flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200'
-          }
-        >
-          {routing?.degraded ? <WifiOff className="h-3.5 w-3.5" /> : <Wifi className="h-3.5 w-3.5" />}
-          {t('routingApiLabel')}:{' '}
-          {routing?.degraded ? t('routingApiDegraded') : t('routingApiOnline')}
-          {routing?.circuit?.state && routing.circuit.state !== 'CLOSED' && (
-            <span className="font-mono text-xs">({routing.circuit.state})</span>
-          )}
-        </span>
-
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={() => onRunAction('routing-api', { mode: 'DOWN' })}
-          className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/25 disabled:opacity-50"
-        >
-          <WifiOff className="h-3.5 w-3.5" />
-          <span>{t('simRoutingDown')}</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={() => onRunAction('routing-api', { mode: 'SLOW' })}
-          className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/25 disabled:opacity-50"
-        >
-          <Timer className="h-3.5 w-3.5" />
-          <span>{t('simRoutingSlow')}</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={() => onRunAction('routing-api', { mode: 'HEALTHY' })}
-          className="flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
-        >
-          <Wifi className="h-3.5 w-3.5" />
-          <span>{t('simRoutingHealthy')}</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={() => onRunAction('reset')}
-          className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-700 disabled:opacity-50"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          <span>{t('simReset')}</span>
-        </button>
-      </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-faint">{t('simGroupRouting')}</span>
+            <span data-testid="routing-api-status" title={routing?.circuit ? `Circuit: ${routing.circuit.state}` : undefined}>
+              <StatusDot tone={routing?.degraded ? 'warning' : 'success'}>
+                {routing?.degraded ? t('routingApiDegraded') : t('routingApiOnline')}
+                {routing?.circuit?.state && routing.circuit.state !== 'CLOSED' && (
+                  <span className="font-mono">({routing.circuit.state})</span>
+                )}
+              </StatusDot>
+            </span>
+            <Button size="sm" disabled={isBusy} onClick={() => onRunAction('routing-api', { mode: 'DOWN' })}>
+              {t('simRoutingDown')}
+            </Button>
+            <Button size="sm" disabled={isBusy} onClick={() => onRunAction('routing-api', { mode: 'SLOW' })}>
+              {t('simRoutingSlow')}
+            </Button>
+            <Button size="sm" disabled={isBusy} onClick={() => onRunAction('routing-api', { mode: 'HEALTHY' })}>
+              {t('simRoutingHealthy')}
+            </Button>
+            <Button variant="ghost" size="sm" disabled={isBusy} onClick={() => onRunAction('reset')}>
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('simReset')}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

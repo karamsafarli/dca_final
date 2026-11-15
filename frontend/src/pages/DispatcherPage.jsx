@@ -122,7 +122,7 @@ export function DispatcherPage({ onAlertsCountChange }) {
 
   if (isLoading && !dashboard) {
     return (
-      <div className="mx-auto max-w-[1600px] p-6 text-sm text-slate-400">
+      <div className="mx-auto max-w-[1600px] p-6 text-sm text-muted">
         {t('loadingDispatcher')}
       </div>
     );

@@ -1,6 +1,7 @@
-import { MapPinned, Navigation } from 'lucide-react';
+import { MapPinned } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { formatDistance } from '../../lib/utils';
+import { Button, Card } from '../ui/primitives';
 
 /**
  * The single most important answer for a citizen in a crisis, shown first:
@@ -12,45 +13,48 @@ export function CitizenStatusHero({ plan, isLoading, onShowMap }) {
 
   if (isLoading && !plan) {
     return (
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4" aria-busy="true">
-        <p className="text-sm text-slate-400">{t('heroLoading')}</p>
-        <div className="mt-3 h-6 w-2/3 animate-pulse rounded bg-slate-800" />
-      </div>
+      <Card className="p-4" aria-busy="true">
+        <p className="text-sm text-muted">{t('heroLoading')}</p>
+        <div className="mt-3 h-6 w-2/3 animate-pulse rounded bg-subtle" />
+        <div className="mt-2 h-4 w-1/2 animate-pulse rounded bg-subtle" />
+      </Card>
     );
   }
 
   if (!point) return null; // the route card shows the explicit "no route" panel
 
+  const percent = point.occupancyPercent ?? 0;
   return (
-    <section
-      aria-labelledby="hero-title"
-      aria-live="polite"
-      className="rounded-2xl border border-emerald-500/40 bg-emerald-950/30 p-4"
-    >
-      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-300">
+    <Card aria-labelledby="hero-title" aria-live="polite" className="p-4">
+      <div className="flex items-center gap-2 text-xs font-medium text-success-fg">
+        <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
         {t('heroLabel')}
-      </p>
-      <h2 id="hero-title" className="mt-1 flex items-start gap-2 text-lg font-bold leading-snug text-white">
-        <Navigation className="mt-1 h-5 w-5 shrink-0 text-emerald-400" aria-hidden="true" />
+      </div>
+      <h2 id="hero-title" className="mt-2 text-xl font-semibold leading-tight tracking-tight text-fg">
         {point.name}
       </h2>
-      <p className="mt-1 text-sm text-emerald-100/90">
-        {t('heroMeta', {
-          distance: formatDistance(point.route?.distanceMeters),
-          min: point.route?.estimatedMinutes || 1,
-          percent: point.occupancyPercent,
-        })}
-      </p>
+      <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-line pt-3">
+        <div>
+          <dt className="text-xs text-muted">{t('distanceLabel')}</dt>
+          <dd className="text-base font-semibold text-fg tabular">{formatDistance(point.route?.distanceMeters)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted">{t('walkLabel')}</dt>
+          <dd className="text-base font-semibold text-fg tabular">~{point.route?.estimatedMinutes || 1} {t('minutesShort')}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted">{t('occupancyLabel')}</dt>
+          <dd className={`text-base font-semibold tabular ${percent >= 90 ? 'text-danger-fg' : percent >= 70 ? 'text-warning-fg' : 'text-fg'}`}>
+            {percent}%
+          </dd>
+        </div>
+      </dl>
       {onShowMap && (
-        <button
-          type="button"
-          onClick={onShowMap}
-          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 px-3 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/10 lg:hidden"
-        >
+        <Button variant="secondary" className="mt-3 w-full lg:hidden" onClick={onShowMap}>
           <MapPinned className="h-4 w-4" aria-hidden="true" />
           {t('heroShowMap')}
-        </button>
+        </Button>
       )}
-    </section>
+    </Card>
   );
 }

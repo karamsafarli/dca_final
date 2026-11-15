@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import { DispatcherLoginCard } from './components/auth/DispatcherLoginCard';
-import { Navbar } from './components/layout/Navbar';
+import { ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CitizenHeader } from './components/layout/CitizenHeader';
+import { ConsoleHeader } from './components/layout/ConsoleHeader';
+import { BrandMark, LanguageSwitch, ThemeToggle } from './components/layout/HeaderControls';
+import { useTheme } from './theme/ThemeContext';
 import { useI18n } from './i18n/I18nContext';
 import { reconnectSocket, socket } from './lib/socket';
 import { CitizenPage } from './pages/CitizenPage';
@@ -11,6 +16,7 @@ import { crisisApi } from './services/crisisApi';
 
 export function App() {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const tRef = useRef(t);
   tRef.current = t;
 
@@ -102,42 +108,75 @@ export function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-dvh bg-slate-950 text-slate-100">
-        <Navbar
-          isSocketConnected={isSocketConnected}
-          activeAlertsCount={activeAlertsCount}
-          dispatcher={dispatcher}
-          onLogout={handleLogout}
-        />
+      <div className="min-h-dvh bg-canvas text-fg">
+        <Routes>
+          {/* Citizen app: public, minimal chrome */}
+          <Route
+            path="/"
+            element={
+              <>
+                <CitizenHeader isSocketConnected={isSocketConnected} />
+                <main>
+                  <CitizenPage />
+                </main>
+              </>
+            }
+          />
 
-        <main>
-          <Routes>
-            <Route path="/" element={<CitizenPage />} />
-            <Route
-              path="/dispatcher"
-              element={
-                !authChecked ? (
-                  <div className="mx-auto max-w-[1600px] p-6 text-sm text-slate-400">
-                    {t('checkingSession')}
-                  </div>
-                ) : dispatcher ? (
-                  <DispatcherPage onAlertsCountChange={setActiveAlertsCount} />
-                ) : (
-                  <DispatcherLoginCard
-                    loginFn={crisisApi.loginDispatcher}
-                    onLoginSuccess={handleLoginSuccess}
+          {/* Dispatcher console: a separate surface, reached via "Operator sign-in" */}
+          <Route
+            path="/dispatcher"
+            element={
+              !authChecked ? (
+                <div className="p-6 text-sm text-muted">{t('checkingSession')}</div>
+              ) : dispatcher ? (
+                <>
+                  <ConsoleHeader
+                    isSocketConnected={isSocketConnected}
+                    activeAlertsCount={activeAlertsCount}
+                    dispatcher={dispatcher}
+                    onLogout={handleLogout}
                   />
-                )
-              }
-            />
-          </Routes>
-        </main>
+                  <main>
+                    <DispatcherPage onAlertsCountChange={setActiveAlertsCount} />
+                  </main>
+                </>
+              ) : (
+                <div className="flex min-h-dvh flex-col">
+                  <header className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between px-4">
+                    <Link
+                      to="/"
+                      className="flex items-center gap-1.5 text-sm text-muted transition hover:text-fg"
+                    >
+                      <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                      {t('backToCitizen')}
+                    </Link>
+                    <div className="flex items-center gap-2">
+                      <LanguageSwitch />
+                      <ThemeToggle />
+                    </div>
+                  </header>
+                  <main className="flex flex-1 flex-col items-center justify-center px-4 pb-16">
+                    <div className="mb-6">
+                      <BrandMark subtitle={t('consoleTitle')} />
+                    </div>
+                    <DispatcherLoginCard
+                      loginFn={crisisApi.loginDispatcher}
+                      onLoginSuccess={handleLoginSuccess}
+                    />
+                  </main>
+                </div>
+              )
+            }
+          />
+        </Routes>
 
         <ToastContainer
           position="bottom-right"
-          theme="dark"
+          theme={theme}
           autoClose={4000}
           newestOnTop
+          hideProgressBar
         />
       </div>
     </BrowserRouter>
